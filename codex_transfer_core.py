@@ -16,12 +16,13 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import time
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Optional
 
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 FORMAT_NAME = "codex-transfer-package"
 FORMAT_VERSION = 1
 MANIFEST_NAME = "codex-transfer-manifest.json"
@@ -81,6 +82,7 @@ EXCLUDED_LABELS = (
     "external repositories and OneDrive workspaces",
 )
 SAFE_AUTOMATION_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+REGENERABLE_WORKSPACE_DIRS = {".android-build-tools"}
 
 Progress = Callable[[str, Optional[float]], None]
 
@@ -143,6 +145,45 @@ def count_files(root: Path) -> int:
     return sum(1 for _ in iter_files(root))
 
 
+def is_regenerable_workspace_path(relative: Path) -> bool:
+    """Return true only for known downloaded caches inside managed workspaces."""
+    parts = tuple(part.casefold() for part in relative.parts)
+    return bool(parts and parts[0] == ".chatgpt-projects" and any(
+        part in REGENERABLE_WORKSPACE_DIRS for part in parts[1:]
+    ))
+
+
+def windows_extended_path(path: Path) -> str:
+    """Use Win32 extended paths so deeply nested project files remain copyable."""
+    value = str(path.resolve())
+    if os.name != "nt" or value.startswith("\\\\?\\"):
+        return value
+    if value.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + value[2:]
+    return "\\\\?\\" + value
+
+
+def copy2_resilient(source: Path, destination: Path, attempts: int = 3) -> None:
+    """Copy a real project file with Windows long-path support and brief retries."""
+    source_os = windows_extended_path(source)
+    destination_os = windows_extended_path(destination)
+    os.makedirs(windows_extended_path(destination.parent), exist_ok=True)
+    last_error: Optional[OSError] = None
+    for attempt in range(attempts):
+        try:
+            shutil.copy2(source_os, destination_os)
+            return
+        except (FileNotFoundError, PermissionError) as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                time.sleep(0.15 * (attempt + 1))
+    raise TransferError(
+        f"Unable to copy data after {attempts} attempts: {source}. "
+        "Close programs that may be changing this file and try again. "
+        f"Windows error: {last_error}"
+    ) from last_error
+
+
 def quote_identifier(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
 
@@ -182,12 +223,17 @@ def source_inventory(source: Path) -> dict[str, Any]:
     return inventory
 
 
-def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> None:
+def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> list[str]:
     candidates: list[tuple[Path, Path]] = []
+    skipped_regenerable = 0
     for dirname in DATA_DIRS:
         root = source / dirname
         for src in iter_files(root):
-            candidates.append((src, stage / src.relative_to(source)))
+            relative = src.relative_to(source)
+            if is_regenerable_workspace_path(relative):
+                skipped_regenerable += 1
+                continue
+            candidates.append((src, stage / relative))
     for filename in PLAIN_FILES:
         src = source / filename
         if src.is_file():
@@ -197,10 +243,17 @@ def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> None
     total = max(len(candidates) + len(DATABASE_FILES) + int(global_state.is_file()), 1)
     done = 0
     for src, dst in candidates:
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
+        copy2_resilient(src, dst)
         done += 1
         progress(f"Copying {src.relative_to(source)}", done / total * 0.55)
+    warnings = []
+    if skipped_regenerable:
+        message = (
+            f"Skipped {skipped_regenerable} regenerable Android build-tool cache files "
+            "inside managed workspaces (.android-build-tools)."
+        )
+        warnings.append(message)
+        progress("Warning: " + message, None)
     if global_state.is_file():
         sanitized = sanitize_global_state(global_state)
         (stage / GLOBAL_STATE_FILE).write_text(
@@ -217,6 +270,7 @@ def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> None
         progress(f"Snapshotting {filename}", done / total * 0.55)
         sqlite_snapshot(src, dst)
         done += 1
+    return warnings
 
 
 def create_package(
@@ -243,7 +297,7 @@ def create_package(
     with tempfile.TemporaryDirectory(prefix="codex-transfer-export-") as temp:
         stage = Path(temp) / "payload"
         stage.mkdir()
-        _copy_source_to_stage(source, stage, progress)
+        export_warnings = _copy_source_to_stage(source, stage, progress)
         entries = []
         staged_files = sorted(iter_files(stage), key=lambda p: p.relative_to(stage).as_posix().lower())
         for index, path in enumerate(staged_files, 1):
@@ -260,6 +314,7 @@ def create_package(
             "payload_files": entries,
             "inventory": inspect_codex_data(stage, check_rollouts=False),
             "excluded_for_security": list(EXCLUDED_LABELS),
+            "export_warnings": export_warnings,
             "mode": "replacement-only",
         }
         manifest_path = stage / MANIFEST_NAME
@@ -627,8 +682,7 @@ def copy_stage_to_destination(stage: Path, destination: Path, progress: Progress
     for index, source in enumerate(files, 1):
         relative = source.relative_to(stage)
         target = destination / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        copy2_resilient(source, target)
         progress(f"Installing {relative}", 0.75 + index / max(len(files), 1) * 0.20)
 
 

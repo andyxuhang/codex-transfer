@@ -51,6 +51,9 @@ class TransferTests(unittest.TestCase):
         managed = self.source / ".chatgpt-projects" / "managed"
         managed.mkdir(parents=True)
         (managed / "work.txt").write_text("work", encoding="utf-8")
+        android_cache = managed.parent / "g-p-cache" / ".android-build-tools" / "cmd-stage"
+        android_cache.mkdir(parents=True)
+        (android_cache / "downloaded.jar").write_bytes(b"regenerable")
         (self.source / "rules").mkdir()
         (self.source / "rules" / "default.rules").write_text("rule", encoding="utf-8")
         (self.source / "skills" / "custom").mkdir(parents=True)
@@ -96,6 +99,8 @@ class TransferTests(unittest.TestCase):
         self.assertNotIn("skills/.system/SYSTEM.md", names)
         self.assertIn("skills/custom/SKILL.md", names)
         self.assertIn("automations/daily/automation.toml", names)
+        self.assertNotIn(".chatgpt-projects/g-p-cache/.android-build-tools/cmd-stage/downloaded.jar", names)
+        self.assertTrue(any("Android build-tool cache" in warning for warning in manifest["export_warnings"]))
         with zipfile.ZipFile(package, "r") as archive:
             exported_state = archive.read(core.GLOBAL_STATE_FILE).decode("utf-8")
         self.assertNotIn("SYNTHETIC-SOURCE-VALUE", exported_state)

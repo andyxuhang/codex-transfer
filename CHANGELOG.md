@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2 — 2026-09-09
+
+- Avoid Windows `WinError 3` failures on deeply nested managed-workspace files by using extended-length paths and bounded copy retries.
+- Exclude downloaded `.android-build-tools` workspace caches, which are regenerated and are not user-authored project data.
+- Record the skipped cache-file count in the migration manifest and GUI output.
+
 ## 1.0.1 — 2026-09-09
 
 - Split the GUI into separate Export and Import tabs while keeping the progress/output panel visible below both pages.

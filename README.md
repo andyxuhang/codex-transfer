@@ -33,6 +33,7 @@ A safe, replacement-only Windows migration utility for local Codex and ChatGPT D
 - `config.toml` 中的机器专用配置
 - `installation_id` 和设备身份
 - 插件运行时、缓存、日志、sandbox、锁和临时文件
+- 托管工作目录中可重新下载的 `.android-build-tools` 构建工具缓存
 - `.codex` 外部的 Git 仓库、OneDrive 文件夹和项目源码
 
 外部项目源码请用 Git、OneDrive 或移动硬盘单独迁移，然后在工具中添加旧路径到新路径的映射。
@@ -45,6 +46,7 @@ A safe, replacement-only Windows migration utility for local Codex and ChatGPT D
 - 导入前把目标电脑的全部可迁移数据备份为 ZIP。
 - 只清除明确白名单中的可迁移数据，目标电脑的登录状态和机器配置保留。
 - 所有路径改写均在临时 staging 目录完成，不修改迁移包。
+- 深层项目文件使用 Windows 扩展长度路径复制；短暂占用会自动重试，真正的项目文件失败不会被静默忽略。
 - 安装中途失败会自动恢复导入前备份。
 - 导入后自动核对数据库线程数、JSONL 数量和每个 `rollout_path`。
 
@@ -123,6 +125,7 @@ These items are hard-coded exclusions to prevent credential or device-identity m
 - Machine-specific `config.toml`
 - `installation_id` and device identity
 - Plugin runtimes, caches, logs, sandboxes, locks, and temporary files
+- Regenerable `.android-build-tools` downloads inside managed workspaces
 - Git repositories, OneDrive folders, and source trees outside `.codex`
 
 Move external workspaces separately with Git, cloud storage, or removable media, then add old-to-new path maps in Codex Transfer.
@@ -135,6 +138,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 - All migratable destination data is backed up before replacement.
 - Only allowlisted user-data paths are cleared. Destination credentials and machine configuration remain intact.
 - Path rewriting happens in a temporary staging directory and never changes the package.
+- Deep project files use Windows extended-length paths; transient copy failures are retried and real project-file failures are never silently ignored.
 - An interrupted installation attempts to restore the pre-import backup automatically.
 - Post-import validation compares database threads with JSONL sessions and checks every rollout path.
 
