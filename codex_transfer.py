@@ -8,6 +8,7 @@ import datetime as dt
 import json
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -70,10 +71,20 @@ TEXT = {
         "choose_package": "选择 Codex Transfer 迁移包",
         "choose_destination": "选择目标 .codex 目录",
         "package_ok": "迁移包校验通过",
+        "package_bad": "迁移包校验失败，目标目录未被修改。详情已写入下方输出框。",
+        "transfer_files": "Codex 迁移包",
+        "all_files": "所有文件",
+        "windows_only": "此快捷操作仅支持 Windows。",
         "version": "版本",
         "folder_missing": "迁移包所在文件夹尚不存在。",
         "codex_running": "● Codex/ChatGPT 正在运行：{names}。请完全关闭后再迁移",
         "codex_closed": "● Codex 已关闭，可以安全迁移",
+        "source_manifest_home": "清单：用户目录",
+        "source_manifest_codex": "清单：Codex 目录",
+        "source_jsonl": "会话记录",
+        "source_sidebar": "侧栏状态",
+        "source_sqlite": "数据库",
+        "source_automation": "自动任务",
     },
     "en": {
         "title": "Codex Transfer",
@@ -126,10 +137,20 @@ TEXT = {
         "choose_package": "Select Codex Transfer package",
         "choose_destination": "Select destination .codex directory",
         "package_ok": "Package verification passed",
+        "package_bad": "Package verification failed. The destination was not changed. Details are in the output panel.",
+        "transfer_files": "Codex Transfer package",
+        "all_files": "All files",
+        "windows_only": "This shortcut is available on Windows only.",
         "version": "Version",
         "folder_missing": "The migration package folder does not exist yet.",
         "codex_running": "● Codex/ChatGPT is running: {names}. Fully close it before migration",
         "codex_closed": "● Codex is closed; migration is safe to start",
+        "source_manifest_home": "Manifest: user home",
+        "source_manifest_codex": "Manifest: Codex directory",
+        "source_jsonl": "Session records",
+        "source_sidebar": "Sidebar state",
+        "source_sqlite": "Database",
+        "source_automation": "Automation",
     },
 }
 
@@ -140,6 +161,88 @@ def translation_key(widget_key: str) -> str:
     if widget_key.endswith("_browse"):
         return "browse"
     return widget_key
+
+
+CORE_ZH_EXACT = {
+    "Scanning conversations, attachments, and automations": "正在扫描聊天、附件和自动任务",
+    "Copying sanitized sidebar and section state": "正在复制经过安全处理的侧栏和分区状态",
+    "Preparing consistent snapshots": "正在准备一致性快照",
+    "Writing migration package": "正在写入迁移包",
+    "Export complete": "导出完成",
+    "The package already exists. Choose a new filename; existing packages are never overwritten.": "迁移包已经存在。请选择新的文件名；工具不会覆盖现有迁移包。",
+    "The migration package must not be inside the source .codex directory.": "迁移包不能保存在源 .codex 目录内部。",
+    "Unsupported migration package format.": "不支持此迁移包格式。",
+    "Package verified": "迁移包校验通过",
+    "Package verification failed": "迁移包校验失败",
+    "Every path map requires both an old and a new prefix.": "每项路径映射都必须同时包含旧路径和新路径。",
+    "Path inspection complete": "路径检查完成",
+    "Unexpected global sidebar state structure.": "侧栏状态结构异常。",
+    "Replacement confirmation is required. Merge mode is not supported.": "必须确认覆盖导入；本工具不支持合并。",
+    "The package and destination .codex directory must not contain one another.": "迁移包与目标 .codex 目录不能互相包含。",
+    "Package hash verification failed. Destination was not changed.": "迁移包哈希校验失败，目标目录未被修改。",
+    "Extracting verified package": "正在解压已校验的迁移包",
+    "Validating imported data": "正在验证导入的数据",
+    "Import complete": "导入完成",
+    "Import completed with validation warnings": "导入完成，但验证发现警告",
+}
+
+
+CORE_ZH_PREFIXES = (
+    ("Close Codex/ChatGPT Desktop before exporting: ", "导出前请完全关闭 Codex/ChatGPT Desktop："),
+    ("Close Codex/ChatGPT Desktop before importing: ", "导入前请完全关闭 Codex/ChatGPT Desktop："),
+    ("Codex data directory not found: ", "找不到 Codex 数据目录："),
+    ("A partial package already exists: ", "已存在未完成的迁移包："),
+    ("SQLite snapshot failed for ", "创建 SQLite 快照失败："),
+    ("Unable to inspect source file: ", "无法检查源文件："),
+    ("Unsafe path in package: ", "迁移包中包含不安全路径："),
+    ("Unsafe drive path in package: ", "迁移包中包含不安全的盘符路径："),
+    ("Migration package not found: ", "找不到迁移包："),
+    ("Invalid migration package: ", "迁移包无效："),
+    ("Unable to inspect package paths: ", "无法检查迁移包路径："),
+    ("Unable to rewrite JSON file ", "无法改写 JSON 文件："),
+    ("Unable to rewrite staged database ", "无法改写临时数据库："),
+    ("Unable to read global sidebar state: ", "无法读取全局侧栏状态："),
+    ("Unable to merge sanitized sidebar state: ", "无法合并经过安全处理的侧栏状态："),
+    ("Unable to read staged global sidebar state: ", "无法读取临时侧栏状态："),
+    ("Backup already exists: ", "备份文件已经存在："),
+    ("Unsafe destination target: ", "目标目录中包含不安全的操作对象："),
+    ("Import failed and rollback also failed: ", "导入失败，并且回滚也失败："),
+    ("Import failed; previous destination data was restored: ", "导入失败，已经恢复原目标数据："),
+)
+
+
+def localize_core_message(message: str, language: str) -> str:
+    if language != "zh" or not message:
+        return message
+    if message in CORE_ZH_EXACT:
+        return CORE_ZH_EXACT[message]
+    for english, chinese in CORE_ZH_PREFIXES:
+        if message.startswith(english):
+            return chinese + message[len(english):]
+    patterns = (
+        (r"^Scanning source: (.+) files checked$", r"正在扫描源数据：已检查 \1 个文件"),
+        (r"^Found (.+) migratable files \((.+) MB\); starting copy$", r"找到 \1 个可迁移文件（\2 MB），开始复制"),
+        (r"^Copying (.+)$", r"正在复制：\1"),
+        (r"^Copied (.+) files \((.+) MB\)$", r"已复制 \1 个文件（\2 MB）"),
+        (r"^Snapshotting (.+)$", r"正在创建快照：\1"),
+        (r"^Hashing (.+)$", r"正在计算校验值：\1"),
+        (r"^Packing (.+)$", r"正在打包：\1"),
+        (r"^Verifying (.+)$", r"正在校验：\1"),
+        (r"^Inspecting paths in (.+)$", r"正在检查路径：\1"),
+        (r"^Invalid JSONL at (.+), line (.+): (.+)$", r"JSONL 文件无效：\1，第 \2 行：\3"),
+        (r"^Rewriting paths in (.+)$", r"正在改写路径：\1"),
+        (r"^Backing up (.+)$", r"正在备份：\1"),
+        (r"^Installing (.+)$", r"正在安装：\1"),
+        (
+            r"^Unable to copy data after (\d+) attempts: (.+)\. Close programs that may be changing this file and try again\. Windows error: (.+)$",
+            r"尝试 \1 次后仍无法复制数据：\2。请关闭可能正在修改该文件的程序后重试。Windows 错误：\3",
+        ),
+    )
+    for pattern, replacement in patterns:
+        converted = re.sub(pattern, replacement, message)
+        if converted != message:
+            return converted
+    return message
 
 
 class CodexTransferApp:
@@ -306,14 +409,17 @@ class CodexTransferApp:
         value = filedialog.asksaveasfilename(
             title=self.t("choose_package_save"), initialfile="Codex-Transfer.codextransfer.zip",
             initialdir=str(Path(self.export_package.get()).parent),
-            defaultextension=".zip", filetypes=(("Codex Transfer", "*.zip"),),
+            defaultextension=".zip", filetypes=((self.t("transfer_files"), "*.zip"),),
         )
         if value:
             self.export_package.set(core.normalize_path_text(value))
 
     def _browse_import_package(self) -> None:
         from tkinter import filedialog
-        value = filedialog.askopenfilename(title=self.t("choose_package"), filetypes=(("Codex Transfer", "*.zip"), ("All files", "*.*")))
+        value = filedialog.askopenfilename(
+            title=self.t("choose_package"),
+            filetypes=((self.t("transfer_files"), "*.zip"), (self.t("all_files"), "*.*")),
+        )
         if value:
             self.import_package.set(core.normalize_path_text(value))
             self.custom_maps.clear()
@@ -339,7 +445,7 @@ class CodexTransferApp:
             if os.name == "nt":
                 os.startfile(str(folder))
             else:
-                raise OSError("This shortcut is available on Windows only.")
+                raise OSError(self.t("windows_only"))
         except OSError as exc:
             messagebox.showerror(self.t("error"), str(exc))
 
@@ -433,9 +539,17 @@ class CodexTransferApp:
 
         def refresh_row(index: int) -> None:
             row = rows[index]
+            source_names = {
+                "manifest:source_user_home": self.t("source_manifest_home"),
+                "manifest:source_codex_dir": self.t("source_manifest_codex"),
+                "JSONL": self.t("source_jsonl"),
+                "sidebar state": self.t("source_sidebar"),
+                "SQLite": self.t("source_sqlite"),
+                "automation": self.t("source_automation"),
+            }
             tree.item(str(index), values=(
                 row["old"], row.get("new", ""), row.get("count", 0),
-                ", ".join(row.get("sources", [])), status_text(row),
+                ", ".join(source_names.get(value, value) for value in row.get("sources", [])), status_text(row),
             ))
 
         for index, row in enumerate(rows):
@@ -538,7 +652,7 @@ class CodexTransferApp:
                 kind, payload = self.events.get_nowait()
                 if kind == "progress":
                     message, fraction = payload
-                    self._append_log(message)
+                    self._append_log(localize_core_message(message, self.language.get()))
                     if fraction is not None:
                         self.progress_value.set(max(0, min(100, fraction * 100)))
                 elif kind == "success":
@@ -548,8 +662,9 @@ class CodexTransferApp:
                 elif kind == "error":
                     exc, details = payload
                     self._set_busy(False)
-                    self._append_log(details)
-                    messagebox.showerror(self.t("error"), str(exc))
+                    visible_error = localize_core_message(str(exc), self.language.get())
+                    self._append_log(f"{self.t('error')}：{visible_error}")
+                    messagebox.showerror(self.t("error"), visible_error)
         except queue.Empty:
             pass
         self.root.after(100, self._drain_events)
@@ -584,7 +699,7 @@ class CodexTransferApp:
         if result["ok"]:
             messagebox.showinfo(self.t("done"), self.t("package_ok"))
         else:
-            messagebox.showerror(self.t("error"), json.dumps(visible, ensure_ascii=False, indent=2))
+            messagebox.showerror(self.t("error"), self.t("package_bad"))
 
     def _import(self) -> None:
         from tkinter import messagebox

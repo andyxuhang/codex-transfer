@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.9 — 2026-09-09
+
+- Localize core migration errors and progress messages throughout the Chinese GUI, including the Codex-not-closed dialog.
+- Localize path-source labels, file-dialog filters, verification failures, and the Windows-only shortcut message.
+- Keep CLI output in English for scripting compatibility and hide raw English tracebacks from normal GUI users.
+- Add regression coverage for Chinese and English message selection.
+
 ## 1.0.8 — 2026-09-09
 
 - Fix all file/folder picker buttons incorrectly showing their adjacent field labels instead of the short Browse caption.

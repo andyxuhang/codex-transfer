@@ -244,6 +244,34 @@ class TransferTests(unittest.TestCase):
             for key in button_keys:
                 self.assertTrue(gui.TEXT[language][key].strip(), f"Missing {language} caption for {key}")
 
+    def test_gui_language_tables_and_core_messages_are_bilingual(self):
+        self.assertEqual(set(gui.TEXT["zh"]), set(gui.TEXT["en"]))
+        samples = (
+            "Close Codex/ChatGPT Desktop before exporting: Codex.exe",
+            "Close Codex/ChatGPT Desktop before importing: ChatGPT.exe",
+            "Scanning conversations, attachments, and automations",
+            "Scanning source: 1,234 files checked",
+            "Found 12 migratable files (3.5 MB); starting copy",
+            "Copying sessions/example.jsonl (1/12, 0.0/3.5 MB)",
+            "Hashing sessions/example.jsonl (1/12)",
+            "Packing state_5.sqlite (12/12)",
+            "Verifying state_5.sqlite",
+            "Inspecting paths in state_5.sqlite",
+            "Rewriting paths in state_5.sqlite",
+            "Backing up sessions/example.jsonl",
+            "Installing sessions/example.jsonl",
+            "Package hash verification failed. Destination was not changed.",
+            "Import complete",
+        )
+        for message in samples:
+            self.assertEqual(gui.localize_core_message(message, "en"), message)
+            self.assertNotEqual(gui.localize_core_message(message, "zh"), message, message)
+        for message in gui.CORE_ZH_EXACT:
+            self.assertNotEqual(gui.localize_core_message(message, "zh"), message)
+        for prefix, _translated in gui.CORE_ZH_PREFIXES:
+            message = prefix + "example"
+            self.assertNotEqual(gui.localize_core_message(message, "zh"), message)
+
     def test_package_path_inspection_groups_roots_without_reading_chat_text(self):
         external = r"D:\ESP32\AeroMeter"
         self.rollout_a.write_text(
