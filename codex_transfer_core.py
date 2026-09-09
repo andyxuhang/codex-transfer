@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import ntpath
 import os
 import re
 import shutil
@@ -20,7 +21,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Optional
 
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 FORMAT_NAME = "codex-transfer-package"
 FORMAT_VERSION = 1
 MANIFEST_NAME = "codex-transfer-manifest.json"
@@ -347,11 +348,24 @@ def extract_verified_package(package: Path, target: Path, manifest: dict[str, An
                 shutil.copyfileobj(source, output, 1024 * 1024)
 
 
+def normalize_path_text(value: str) -> str:
+    """Normalize a user-entered path without confusing POSIX and Windows roots."""
+    value = str(value).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1].strip()
+    if not value:
+        return value
+    is_windows = bool(re.match(r"^[A-Za-z]:[\\/]", value)) or value.startswith(("\\\\", "//"))
+    if is_windows:
+        return ntpath.normpath(value.replace("/", "\\"))
+    return os.path.normpath(value)
+
+
 def parse_path_maps(values: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
     maps = []
     for old, new in values:
-        old = str(old).strip().rstrip("\\/")
-        new = str(new).strip().rstrip("\\/")
+        old = normalize_path_text(old)
+        new = normalize_path_text(new)
         if not old or not new:
             raise TransferError("Every path map requires both an old and a new prefix.")
         maps.append((old, new))
@@ -369,7 +383,7 @@ def replace_path_prefix(value: str, maps: list[tuple[str, str]]) -> str:
         old_cmp = old.replace("/", "\\")
         low_value, low_old = comparable.lower(), old_cmp.lower()
         if low_value == low_old or low_value.startswith(low_old + "\\"):
-            replaced = new + comparable[len(old_cmp):]
+            replaced = normalize_path_text(new + comparable[len(old_cmp):])
             return "\\\\?\\" + replaced if extended else replaced
     return value
 

@@ -96,8 +96,8 @@ class CodexTransferApp:
         self.ttk = ttk
         self.root = tk.Tk()
         self.root.title("Codex Transfer")
-        self.root.geometry("900x760")
-        self.root.minsize(760, 650)
+        self.root.geometry("900x690")
+        self.root.minsize(760, 600)
         self.language = tk.StringVar(value="zh")
         self.source = tk.StringVar(value=str(core.default_codex_dir()))
         default_package = Path.home() / "Desktop" / "Codex-Transfer.codextransfer.zip"
@@ -132,7 +132,9 @@ class CodexTransferApp:
 
     def _build_path_row(self, parent: Any, row: int, label_key: str, variable: Any, browse: Callable[[], None]) -> None:
         self._label(parent, label_key).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=6)
-        self.ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", pady=6)
+        entry = self.ttk.Entry(parent, textvariable=variable)
+        entry.grid(row=row, column=1, sticky="ew", pady=6)
+        entry.bind("<FocusOut>", lambda _event: self._normalize_variable(variable))
         self._button(parent, f"{label_key}_browse", browse, width=11).grid(row=row, column=2, padx=(8, 0), pady=6)
 
     def _build(self) -> None:
@@ -149,10 +151,13 @@ class CodexTransferApp:
         self.widgets["subtitle"] = ttk.Label(outer, foreground="#555555")
         self.widgets["subtitle"].pack(anchor="w", pady=(3, 14))
 
-        export_box = ttk.LabelFrame(outer, padding=12)
-        export_box.pack(fill="x", pady=(0, 12))
+        self.notebook = ttk.Notebook(outer)
+        self.notebook.pack(fill="x", pady=(0, 12))
+
+        export_box = ttk.Frame(self.notebook, padding=12)
         export_box.columnconfigure(1, weight=1)
-        self.widgets["export"] = export_box
+        self.notebook.add(export_box)
+        self.export_page = export_box
         self._build_path_row(export_box, 0, "source", self.source, self._browse_source)
         self._build_path_row(export_box, 1, "package", self.export_package, self._browse_export_package)
         actions = ttk.Frame(export_box)
@@ -160,16 +165,20 @@ class CodexTransferApp:
         self._button(actions, "scan", self._scan).pack(side="left", padx=4)
         self._button(actions, "create", self._export).pack(side="left", padx=4)
 
-        import_box = ttk.LabelFrame(outer, padding=12)
-        import_box.pack(fill="x", pady=(0, 12))
+        import_box = ttk.Frame(self.notebook, padding=12)
         import_box.columnconfigure(1, weight=1)
-        self.widgets["import"] = import_box
+        self.notebook.add(import_box)
+        self.import_page = import_box
         self._build_path_row(import_box, 0, "package_import", self.import_package, self._browse_import_package)
         self._build_path_row(import_box, 1, "destination", self.destination, self._browse_destination)
         self._label(import_box, "old_path").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=6)
-        ttk.Entry(import_box, textvariable=self.old_path).grid(row=2, column=1, sticky="ew", pady=6)
+        old_entry = ttk.Entry(import_box, textvariable=self.old_path)
+        old_entry.grid(row=2, column=1, sticky="ew", pady=6)
+        old_entry.bind("<FocusOut>", lambda _event: self._normalize_variable(self.old_path))
         self._label(import_box, "new_path").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=6)
-        ttk.Entry(import_box, textvariable=self.new_path).grid(row=3, column=1, sticky="ew", pady=6)
+        new_entry = ttk.Entry(import_box, textvariable=self.new_path)
+        new_entry.grid(row=3, column=1, sticky="ew", pady=6)
+        new_entry.bind("<FocusOut>", lambda _event: self._normalize_variable(self.new_path))
         self._button(import_box, "add_map", self._add_map).grid(row=2, column=2, rowspan=2, padx=(8, 0))
         self.maps = tk.Listbox(import_box, height=3, selectmode="extended")
         self.maps.grid(row=4, column=1, sticky="ew", pady=6)
@@ -196,11 +205,11 @@ class CodexTransferApp:
         scroll.pack(side="right", fill="y")
 
     def _translate(self) -> None:
+        self.notebook.tab(self.export_page, text=self.t("export"))
+        self.notebook.tab(self.import_page, text=self.t("import"))
         for key, widget in self.widgets.items():
             translated_key = "package" if key == "package_import" else (key[:-7] if key.endswith("_browse") else key)
-            if key in {"export", "import"}:
-                widget.configure(text=self.t(key))
-            elif translated_key in TEXT[self.language.get()]:
+            if translated_key in TEXT[self.language.get()]:
                 widget.configure(text=self.t(translated_key))
         self.status.set(self.t("ready"))
         self.root.title(f"{self.t('title')} — {core.APP_VERSION}")
@@ -209,7 +218,7 @@ class CodexTransferApp:
         from tkinter import filedialog
         value = filedialog.askdirectory(title=self.t("choose_source"), initialdir=self.source.get())
         if value:
-            self.source.set(value)
+            self.source.set(core.normalize_path_text(value))
 
     def _browse_export_package(self) -> None:
         from tkinter import filedialog
@@ -218,23 +227,29 @@ class CodexTransferApp:
             defaultextension=".zip", filetypes=(("Codex Transfer", "*.zip"),),
         )
         if value:
-            self.export_package.set(value)
+            self.export_package.set(core.normalize_path_text(value))
 
     def _browse_import_package(self) -> None:
         from tkinter import filedialog
         value = filedialog.askopenfilename(title=self.t("choose_package"), filetypes=(("Codex Transfer", "*.zip"), ("All files", "*.*")))
         if value:
-            self.import_package.set(value)
+            self.import_package.set(core.normalize_path_text(value))
 
     def _browse_destination(self) -> None:
         from tkinter import filedialog
         value = filedialog.askdirectory(title=self.t("choose_destination"), initialdir=self.destination.get())
         if value:
-            self.destination.set(value)
+            self.destination.set(core.normalize_path_text(value))
+
+    def _normalize_variable(self, variable: Any) -> str:
+        value = core.normalize_path_text(variable.get())
+        variable.set(value)
+        return value
 
     def _add_map(self) -> None:
         from tkinter import messagebox
-        old, new = self.old_path.get().strip(), self.new_path.get().strip()
+        old = self._normalize_variable(self.old_path)
+        new = self._normalize_variable(self.new_path)
         if not old or not new:
             messagebox.showwarning(self.t("warning"), self.t("map_missing"))
             return
@@ -303,11 +318,14 @@ class CodexTransferApp:
         self.root.after(100, self._drain_events)
 
     def _scan(self) -> None:
-        self._run(lambda: core.source_inventory(Path(self.source.get())), self._show_json)
+        source = Path(self._normalize_variable(self.source))
+        self._run(lambda: core.source_inventory(source), self._show_json)
 
     def _export(self) -> None:
+        source = Path(self._normalize_variable(self.source))
+        package = Path(self._normalize_variable(self.export_package))
         self._run(
-            lambda: core.create_package(Path(self.source.get()), Path(self.export_package.get()), self._progress),
+            lambda: core.create_package(source, package, self._progress),
             lambda result: self._finish_export(result),
         )
 
@@ -318,7 +336,8 @@ class CodexTransferApp:
         messagebox.showinfo(self.t("done"), str(Path(self.export_package.get()).resolve()))
 
     def _verify(self) -> None:
-        self._run(lambda: core.verify_package(Path(self.import_package.get()), self._progress), self._finish_verify)
+        package = Path(self._normalize_variable(self.import_package))
+        self._run(lambda: core.verify_package(package, self._progress), self._finish_verify)
 
     def _finish_verify(self, result: dict[str, Any]) -> None:
         from tkinter import messagebox
@@ -336,11 +355,12 @@ class CodexTransferApp:
             return
         if not messagebox.askyesno(self.t("warning"), self.t("confirm_dialog"), icon="warning"):
             return
-        package = Path(self.import_package.get())
+        package = Path(self._normalize_variable(self.import_package))
+        destination = Path(self._normalize_variable(self.destination))
         result_path = package.with_name(package.stem + ".import-result.json")
         self._run(
             lambda: core.import_package(
-                package, Path(self.destination.get()), self._map_values(), True, self._progress,
+                package, destination, self._map_values(), True, self._progress,
             ),
             lambda result: self._finish_import(result, result_path),
         )

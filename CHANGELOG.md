@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — 2026-09-09
+
+- Split the GUI into separate Export and Import tabs while keeping the progress/output panel visible below both pages.
+- Normalize Windows paths from file dialogs and manual input to backslashes.
+- Normalize both sides of custom path maps to prevent mixed-separator results.
+
 ## 1.0.0 — 2026-09-09
 
 - Initial public release.

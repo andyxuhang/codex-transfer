@@ -160,6 +160,21 @@ class TransferTests(unittest.TestCase):
                 target.writestr(info, data)
         self.assertFalse(core.verify_package(rewritten)["ok"])
 
+    def test_windows_paths_are_normalized_before_mapping(self):
+        self.assertEqual(
+            core.normalize_path_text("D:/Users/Andy Xu/Desktop/Codex-Transfer.zip"),
+            r"D:\Users\Andy Xu\Desktop\Codex-Transfer.zip",
+        )
+        self.assertEqual(core.normalize_path_text('"C:/Users/Andy Xu/.codex"'), r"C:\Users\Andy Xu\.codex")
+        self.assertEqual(core.normalize_path_text("C:/"), "C:\\")
+        maps = core.parse_path_maps([
+            ("C:/Users/Andy Xu/Documents/Codex", "D:/Users/Andy Xu/Documents/Codex"),
+        ])
+        self.assertEqual(
+            core.replace_path_prefix(r"C:\Users\Andy Xu\Documents\Codex\Project", maps),
+            r"D:\Users\Andy Xu\Documents\Codex\Project",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

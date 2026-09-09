@@ -59,12 +59,14 @@ A safe, replacement-only Windows migration utility for local Codex and ChatGPT D
 
 1. 下载仓库或 Release ZIP。
 2. 双击 `run_codex_transfer.cmd`。
-3. 在旧电脑选择 `.codex` 数据目录和迁移包位置，点击“扫描”，然后“创建迁移包”。
+3. 在“旧电脑：导出”页面选择 `.codex` 数据目录和迁移包位置，点击“扫描”，然后“创建迁移包”。
 4. 把整个迁移包复制到新电脑。
-5. 在新电脑打开本工具，选择迁移包和目标 `.codex`，点击“校验迁移包”。
+5. 在新电脑打开本工具，切换到“新电脑：覆盖导入”页面，选择迁移包和目标 `.codex`，点击“校验迁移包”。
 6. 如果项目路径改变，添加一项或多项“旧路径 → 新路径”。用户名和 `.codex` 根目录会自动映射。
 7. 完全退出 Codex，勾选覆盖确认框，点击“备份并覆盖导入”。
 8. 保存备份和结果 JSON，启动 Codex 检查聊天、分区和自动任务。
+
+底部的“进度与结果”框在两个页面中始终可见。Windows 路径中的 `/` 和 `\` 均可输入，工具会在界面和路径映射中统一转换为 `\`。
 
 ### 命令行（可选）
 
@@ -147,12 +149,14 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 
 1. Download the repository or release ZIP.
 2. Double-click `run_codex_transfer.cmd`.
-3. On the old PC, select the `.codex` directory and a package path. Scan, then create the package.
+3. On the **Old PC: Export** tab, select the `.codex` directory and a package path. Scan, then create the package.
 4. Copy the package to the new PC.
-5. On the new PC, select and verify the package, then select the destination `.codex` directory.
+5. On the new PC, open the **New PC: Replace import** tab, select and verify the package, then select the destination `.codex` directory.
 6. Add path maps if external project locations changed. User-home and `.codex` roots are mapped automatically.
 7. Fully close Codex, accept the replacement confirmation, and start the import.
 8. Keep the backup and result JSON while checking chats, sections, and automations in Codex.
+
+The progress/output panel remains visible below both tabs. Either `/` or `\` is accepted in Windows path fields; the GUI and path mapper normalize them to `\`.
 
 ### Important limitations
 
