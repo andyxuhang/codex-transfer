@@ -21,7 +21,8 @@ Maintainers and coding agents: read the bilingual [Maintainer Guide](docs/MAINTA
 
 - Local chats and Work tasks in `sessions` and `archived_sessions`
 - Conversation attachments
-- Custom sidebar sections, pins, and layout state from sanitized UI metadata
+- Thread paths and section assignments stored in `state_5.sqlite`
+- Custom sidebar sections, pins, and layout state
 - Automations and schedules from `automations/*/automation.toml`
 - Automatic user-home and `.codex` path migration, plus custom path-prefix maps
 - A separate path-review window that groups deep references and lets users decide each project-root mapping
@@ -34,7 +35,6 @@ These items are hard-coded exclusions to prevent credential or device-identity m
 - `.env` and API keys
 - Machine-specific `config.toml`
 - `installation_id` and device identity
-- `state_5.sqlite`, `state_5.sqlite-wal`, and `state_5.sqlite-shm` (machine-local index and device metadata)
 - Plugin runtimes, caches, logs, sandboxes, locks, and temporary files
 - Managed workspace contents under `.chatgpt-projects`, project source, and build output
 - Generated images, memories, rules, custom skills, and vendor-import directories
@@ -45,7 +45,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 ### Safety model
 
 - Replacement only; database merge is intentionally unavailable.
-- The old PC's three `state_5.sqlite*` files are never packaged. Before import, the new PC's copies are backed up and removed so Codex can rebuild a fresh machine-local index from the imported session files.
+- SQLite databases are exported through the Backup API for consistent snapshots.
 - Every payload file is protected by SHA-256; verification failure blocks import.
 - All migratable destination data is backed up before replacement.
 - Only allowlisted user-data paths are cleared; destination credentials and machine configuration remain intact.
@@ -53,7 +53,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 - Path rewriting happens in a temporary staging directory and never changes the package.
 - Destination workspaces, rules, memories, and skills remain untouched.
 - An interrupted installation attempts to restore the pre-import backup automatically.
-- Post-import validation checks the imported session files and records that the local database must be rebuilt on first launch.
+- Post-import validation compares database threads with JSONL sessions and checks every rollout path.
 
 ### Requirements
 
@@ -75,7 +75,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 6. Fully close Codex/ChatGPT, open the orange **New PC: Replace import** tab, select the migration package on the USB drive, and verify it. The destination `.codex` directory is normally filled in automatically.
 7. Use **Review and set path maps** only if project locations or drive letters changed. User-home and `.codex` changes are mapped automatically; unresolved external project paths can be assigned manually.
 8. Select the replacement confirmation checkbox to enable the final import button, accept the warning dialog, and start the import.
-9. After completion, start Codex and allow its local index to rebuild, then check chats, sections, and automations. Keep the USB migration package, automatic backup, and result JSON until everything is confirmed. Individual chat-to-section assignments may need to be restored manually because the machine-local database is intentionally excluded.
+9. After completion, open Codex and check chats, sections, and automations. Keep the USB migration package, automatic backup, and result JSON until everything is confirmed.
 
 For the source version, download the source ZIP and double-click `run_codex_transfer.cmd`. The same workflow applies, but the default package location is beside the script rather than beside the EXE.
 
@@ -121,7 +121,6 @@ Keep both the migration package and backup until the new PC has been verified.
 - Local data formats are undocumented implementation details and may change.
 - Cloud-only data remains governed by the signed-in account and is not copied.
 - External repositories and `.chatgpt-projects` workspaces are not bundled.
-- Custom section definitions/layout are migrated through sanitized UI state, but individual thread-to-section database assignments are not copied.
 - Importing into a different application version can trigger the application's own database migrations.
 
 ---
@@ -132,7 +131,8 @@ Keep both the migration package and backup until the new PC has been verified.
 
 - `sessions`、`archived_sessions` 中的本地聊天和 Work 任务
 - 会话附件
-- 经过安全处理的界面元数据中的自定义侧栏分区、置顶状态和布局
+- `state_5.sqlite` 中的线程、项目路径和分区归属
+- 自定义侧栏分区、置顶状态和界面布局数据
 - `automations/*/automation.toml` 中的自动任务及定时计划
 - 不同用户名、盘符和项目根目录的路径映射
 - 独立路径检查窗口：归并深层路径、显示引用来源，并在导入前逐项决定是否映射
@@ -145,7 +145,6 @@ Keep both the migration package and backup until the new PC has been verified.
 - `.env` 和 API 密钥
 - `config.toml` 中的机器专用配置
 - `installation_id` 和设备身份
-- `state_5.sqlite`、`state_5.sqlite-wal` 和 `state_5.sqlite-shm`（本机索引及设备信息）
 - 插件运行时、缓存、日志、sandbox、锁和临时文件
 - `.chatgpt-projects` 托管工作目录、项目源码和构建输出
 - 生成图片、记忆、规则、自定义技能及第三方导入目录
@@ -156,7 +155,7 @@ Keep both the migration package and backup until the new PC has been verified.
 ### 安全设计
 
 - 只支持完整覆盖，不提供数据库合并。
-- 旧电脑的三个 `state_5.sqlite*` 文件绝不进入迁移包。导入前会先备份并删除新电脑的对应文件，让 Codex 根据迁入的会话文件重建全新的本机索引。
+- 导出时使用 SQLite Backup API 创建一致性快照，不直接修改源数据库。
 - 迁移包中的每个文件都有 SHA-256；任一文件缺失或改变都会阻止导入。
 - 导入前会把目标电脑的全部可迁移数据备份为 ZIP。
 - 只清除白名单内的可迁移数据；目标电脑的登录状态和机器配置会保留。
@@ -164,7 +163,7 @@ Keep both the migration package and backup until the new PC has been verified.
 - 路径改写全部在临时目录中完成，不修改原迁移包。
 - 目标电脑中的工作目录、规则、记忆和技能不会被覆盖。
 - 安装中途失败时会尝试自动恢复导入前备份。
-- 导入后自动核对会话文件，并在结果中明确标记首次启动时需要重建本机数据库。
+- 导入后自动核对数据库线程、JSONL 会话数量和每个 `rollout_path`。
 
 ### 系统要求
 
@@ -186,7 +185,7 @@ Keep both the migration package and backup until the new PC has been verified.
 6. 完全退出 Codex/ChatGPT，打开橙色“新电脑：覆盖导入”页面，选择 U 盘中的迁移包并进行校验。目标 `.codex` 目录通常会自动填写。
 7. 只有在项目位置或盘符发生变化时，才需要打开“查看并设置路径映射”。用户目录和 `.codex` 的变化会自动映射；无法识别的外部项目路径可以手动指定。
 8. 勾选覆盖确认框以启用最终导入按钮，确认警告弹窗，然后开始导入。
-9. 完成后启动 Codex，等待本机索引重建，再检查聊天、分区和自动任务。由于本机数据库被明确排除，个别聊天所属分区可能需要手动恢复。确认全部正常之前，请保留 U 盘中的迁移包、自动备份和结果 JSON。
+9. 完成后启动 Codex，检查聊天、分区和自动任务。确认全部正常之前，请保留 U 盘中的迁移包、自动备份和结果 JSON。
 
 如需使用源码版，请下载源码 ZIP 并双击 `run_codex_transfer.cmd`。操作流程相同，但迁移包默认保存在脚本旁边，而不是 EXE 旁边。
 
@@ -232,7 +231,6 @@ C:\Users\<用户名>\CodexTransferBackups\before-import-YYYYMMDD-HHMMSS.zip
 - 本地数据格式属于未公开的实现细节，后续可能发生变化。
 - 仅存在于云端的数据由登录账号管理，本工具不会复制。
 - 外部 Git 仓库和 `.chatgpt-projects` 工作目录不会被打包。
-- 自定义分区定义和布局通过安全处理后的界面状态迁移，但不会复制数据库中的单条聊天分区归属。
 - 跨应用版本导入时，应用自身可能执行数据库迁移。
 
 ## Development

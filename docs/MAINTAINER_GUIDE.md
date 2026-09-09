@@ -19,7 +19,7 @@ The stable contract is:
 5. Back up the destination's migratable scope.
 6. Replace only that scope while preserving credentials and machine state.
 7. Restore the backup if installation fails.
-8. Validate imported session files and mark the machine-local index for rebuild after import.
+8. Validate thread/session counts and rollout paths after import.
 
 Merge import is not implemented. A package containing one selected chat would still replace the destination unless a separately designed merge mode is added.
 
@@ -62,6 +62,7 @@ Included files:
 
 ```text
 session_index.jsonl
+state_5.sqlite
 .codex-global-state.json   # sanitized; selected sidebar/UI keys only
 ```
 
@@ -69,18 +70,17 @@ Explicitly excluded:
 
 ```text
 auth.json, .env, config.toml, installation_id
-state_5.sqlite, state_5.sqlite-wal, state_5.sqlite-shm
 plugins, cache, logs, sandbox, and temporary/runtime data
 .chatgpt-projects and external project/repository contents
 generated_images, memories, and memories_1.sqlite
 rules, custom skills, and vendor_imports
 ```
 
-Import replaces only paths returned by `scoped_paths()`. Most excluded destination data remains untouched; the three machine-local index files are the deliberate exception: they are backed up and removed so stale rows and old device identity cannot survive the replacement.
+Import replaces only paths returned by `scoped_paths()`. Excluded destination data remains untouched.
 
 When changing scope, update all of these together:
 
-- `DATA_DIRS`, `PLAIN_FILES`, `LOCAL_INDEX_FILES`, and `EXCLUDED_LABELS`
+- `DATA_DIRS`, `PLAIN_FILES`, `DATABASE_FILES`, and `EXCLUDED_LABELS`
 - `is_allowed_payload_path()` and `scoped_paths()` assumptions
 - inventory and post-import validation
 - synthetic fixtures and package-rejection tests
@@ -92,13 +92,13 @@ Treat accidental inclusion of an excluded item as a security defect.
 
 Packages are ZIP files normally named `*.codextransfer.zip`. They are compressed but not encrypted. The ZIP root contains the allowlisted payload plus `codex-transfer-manifest.json`.
 
-Manifest format version 2 contains:
+Manifest format version 1 contains:
 
 ```json
 {
   "format": "codex-transfer-package",
-  "format_version": 2,
-  "tool_version": "1.3.0",
+  "format_version": 1,
+  "tool_version": "1.1.0",
   "created_at": "ISO-8601 timestamp",
   "source_codex_dir": "C:\\Users\\OldUser\\.codex",
   "source_user_home": "C:\\Users\\OldUser",
@@ -122,6 +122,7 @@ Archive names use POSIX `/` separators. `_safe_zip_name()` rejects absolute path
 validate source/output and require Codex to be closed
   → copy allowlisted files to a temporary stage
   → sanitize sidebar state
+  → snapshot SQLite with sqlite3.backup()
   → hash every staged file and create the manifest
   → write <package>.partial
   → atomically rename to the final ZIP
@@ -144,7 +145,7 @@ require explicit replacement confirmation and closed Codex
   → back up the destination's scoped data
   → clear and install only scoped data
   → roll back from backup on installation failure
-  → validate imported sessions and record that the local index needs rebuilding
+  → validate sessions, database rows, sections, and rollout paths
 ```
 
 Backups are written outside `.codex`:
@@ -155,17 +156,17 @@ C:\Users\<user>\CodexTransferBackups\before-import-YYYYMMDD-HHMMSS.zip
 
 The result JSON is written beside the migration package. Do not place either output inside `.codex`.
 
-### 7. Machine-local SQLite index
+### 7. SQLite and schema compatibility
 
-`state_5.sqlite` and its `-wal`/`-shm` sidecars are never exported because they may contain computer identity and device metadata. Source scanning may open the main database read-only for diagnostics. Replacement import backs up all three destination files and removes them, but does not install replacements. Codex is expected to rebuild a fresh local index from the imported rollout JSONL files on next launch.
+`state_5.sqlite` is snapshotted through SQLite's backup API instead of being copied while active. Runtime schema is discovered through `sqlite_master` and `PRAGMA table_info`; unknown tables and columns should not crash path inspection or rewriting.
 
-This privacy boundary means individual thread-to-section assignments stored only in SQLite are not portable. Preserve section definitions and layout only through the sanitized global UI state. Any future portable metadata format must be separately designed and must not recreate or copy the machine database.
+Only columns named in `PATH_FIELD_NAMES` are rewritten. Identifiers pass through `quote_identifier()` and values use SQL parameters. Current validation recognizes `threads` and `thread_sections` when present. Future schema support should use feature detection and synthetic compatibility tests.
 
 ### 8. Path mapping
 
 Windows paths entered with `/` or `\` are normalized. Automatic mappings cover old `.codex` to destination `.codex` and old user home to destination user home. Custom mappings are optional and sorted longest-prefix-first.
 
-Rewriting occurs only in staged JSON/JSONL path fields, automation TOML, and selected sidebar state. The path-review dialog extracts structured values and groups deep references into top-level roots; it must not scan arbitrary chat prose.
+Rewriting occurs only in staged JSON/JSONL path fields, automation TOML, selected sidebar state, and recognized SQLite path columns. The path-review dialog extracts structured values and groups deep references into top-level roots; it must not scan arbitrary chat prose.
 
 ### 9. GUI architecture
 
@@ -247,7 +248,7 @@ Codex Transfer 是一个 Windows 优先的非官方迁移工具，用于迁移�
 
 ### 2. 代码分工
 
-- `codex_transfer_core.py`：白名单、打包、校验、本机索引清理、路径映射、备份、覆盖、回滚和验证。
+- `codex_transfer_core.py`：白名单、打包、校验、SQLite 快照、路径映射、备份、覆盖、回滚和验证。
 - `codex_transfer.py`：Tkinter 界面、中英文翻译、后台线程事件队列和 CLI。
 - `tests/test_core.py`：完全使用合成数据的端到端测试和回归测试。
 - `AGENTS.md`：GPT 或其他编码代理开始工作时必须先读取的简短约束。
@@ -265,6 +266,7 @@ archived_sessions/
 attachments/
 automations/
 session_index.jsonl
+state_5.sqlite
 经过清理的 .codex-global-state.json
 ```
 
@@ -272,18 +274,17 @@ session_index.jsonl
 
 ```text
 auth.json、.env、config.toml、installation_id
-state_5.sqlite、state_5.sqlite-wal、state_5.sqlite-shm
 plugins、cache、logs、sandbox、临时运行数据
 .chatgpt-projects 和外部项目源码/仓库
 generated_images、memories、memories_1.sqlite
 rules、自定义 skills、vendor_imports
 ```
 
-导入时只清理和替换 `scoped_paths()` 返回的内容。大多数排除项在目标电脑保持不变；三个本机索引文件是特例，会先备份再删除，避免旧索引和设备身份残留。任何把排除项意外写入迁移包的改动都应视为安全漏洞。
+导入时只清理和替换 `scoped_paths()` 返回的内容，排除项在目标电脑保持不变。任何把排除项意外写入迁移包的改动都应视为安全漏洞。
 
 如果修改迁移范围，必须同步检查：
 
-- `DATA_DIRS`、`PLAIN_FILES`、`LOCAL_INDEX_FILES`、`EXCLUDED_LABELS`
+- `DATA_DIRS`、`PLAIN_FILES`、`DATABASE_FILES`、`EXCLUDED_LABELS`
 - `is_allowed_payload_path()` 的 ZIP 白名单
 - `scoped_paths()` 的备份、清理和回滚范围
 - 扫描结果和导入后验证
@@ -297,6 +298,7 @@ rules、自定义 skills、vendor_imports
 检查路径和 Codex 进程
   → 复制白名单数据到临时目录
   → 清理侧边栏状态
+  → 使用 SQLite backup API 创建一致快照
   → 计算每个文件的 SHA-256 并生成 manifest
   → 写入 .partial
   → 原子重命名为最终 ZIP
@@ -312,7 +314,7 @@ rules、自定义 skills、vendor_imports
   → 备份目标端白名单范围
   → 清理并安装白名单数据
   → 失败时回滚
-  → 验证迁入的会话，并记录本机索引需要重建
+  → 验证聊天、数据库、分区和 rollout 路径
 ```
 
 迁移包不会静默覆盖已有文件。迁移包是明文 ZIP，必须当作机密数据保存。备份默认位于：
@@ -321,11 +323,11 @@ rules、自定义 skills、vendor_imports
 C:\Users\<用户名>\CodexTransferBackups\before-import-YYYYMMDD-HHMMSS.zip
 ```
 
-### 5. 本机 SQLite 索引与路径映射
+### 5. SQLite 与路径映射
 
-`state_5.sqlite` 及其 `-wal`/`-shm` 辅助文件可能包含电脑身份和设备信息，因此绝不导出。扫描源数据时可以只读打开主数据库用于诊断。覆盖导入会先备份新电脑上的三个文件，再将它们删除，但不会安装旧电脑的替代文件。下次启动 Codex 时，应由 Codex 根据迁入的 rollout JSONL 文件重建全新的本机索引。
+`state_5.sqlite` 通过 SQLite backup API 生成一致快照。表结构使用 `sqlite_master` 和 `PRAGMA table_info` 动态发现；遇到未知表或字段时应保持兼容。
 
-这项隐私边界意味着，只存在于 SQLite 中的单条聊天分区归属不能迁移。分区定义和布局只能通过经过安全处理的全局界面状态迁移。未来如需便携元数据格式，必须单独设计，并且不能重新创建或复制本机数据库。
+只改写 `PATH_FIELD_NAMES` 中声明的路径字段。SQL 标识符必须使用 `quote_identifier()`，字段值必须参数化。不要把用户输入直接拼接进 SQL。
 
 旧 `.codex` 到新 `.codex`、旧用户目录到新用户目录会自动映射。自定义映射按旧路径长度从长到短执行。路径查看窗口只提取结构化字段，不应扫描聊天正文。
 

@@ -84,8 +84,6 @@ class TransferTests(unittest.TestCase):
         db.execute("INSERT INTO threads VALUES (?, ?, ?, 1, NULL)", (THREAD_B, str(self.rollout_b), str(old_project)))
         db.commit()
         db.close()
-        (self.source / "state_5.sqlite-wal").write_bytes(b"synthetic-old-machine-wal")
-        (self.source / "state_5.sqlite-shm").write_bytes(b"synthetic-old-machine-shm")
         (self.source / "auth.json").write_text("SECRET", encoding="utf-8")
         (self.source / ".env").write_text("API_KEY=SECRET", encoding="utf-8")
         (self.source / "config.toml").write_text("secret='SECRET'", encoding="utf-8")
@@ -100,9 +98,6 @@ class TransferTests(unittest.TestCase):
         self.assertNotIn("auth.json", names)
         self.assertNotIn(".env", names)
         self.assertNotIn("config.toml", names)
-        self.assertNotIn("state_5.sqlite", names)
-        self.assertNotIn("state_5.sqlite-wal", names)
-        self.assertNotIn("state_5.sqlite-shm", names)
         self.assertNotIn("skills/.system/SYSTEM.md", names)
         self.assertNotIn("skills/custom/SKILL.md", names)
         self.assertNotIn(".chatgpt-projects/managed/work.txt", names)
@@ -123,13 +118,6 @@ class TransferTests(unittest.TestCase):
         existing = destination / "sessions" / "old.jsonl"
         existing.parent.mkdir()
         existing.write_text("{}\n", encoding="utf-8")
-        destination_db = sqlite3.connect(destination / "state_5.sqlite")
-        destination_db.execute("CREATE TABLE machine_state (computer_name TEXT)")
-        destination_db.execute("INSERT INTO machine_state VALUES ('NEW-PC')")
-        destination_db.commit()
-        destination_db.close()
-        (destination / "state_5.sqlite-wal").write_bytes(b"new-machine-wal")
-        (destination / "state_5.sqlite-shm").write_bytes(b"new-machine-shm")
         preserved_workspace = destination / ".chatgpt-projects" / "keep" / "source.txt"
         preserved_workspace.parent.mkdir(parents=True)
         preserved_workspace.write_text("KEEP-WORKSPACE", encoding="utf-8")
@@ -147,19 +135,11 @@ class TransferTests(unittest.TestCase):
             result = core.import_package(package, destination, [(str(self.old_home), str(new_home))], True)
         self.assertTrue(result["applied"])
         self.assertTrue(result["validation"]["ok"])
-        self.assertIsNone(result["validation"]["database_threads"])
-        self.assertFalse(result["validation"]["database_present"])
-        self.assertTrue(result["validation"]["database_rebuild_required"])
-        self.assertEqual(set(result["local_index_files_backed_up"]), set(core.LOCAL_INDEX_FILES))
+        self.assertEqual(result["validation"]["database_threads"], 2)
         self.assertEqual(result["validation"]["session_files"], 2)
         self.assertEqual(result["validation"]["automations"], 1)
-        self.assertIsNone(result["validation"]["custom_sections"])
+        self.assertEqual(result["validation"]["custom_sections"], 1)
         self.assertTrue(Path(result["backup"]).is_file())
-        with zipfile.ZipFile(result["backup"], "r") as backup:
-            backup_names = set(backup.namelist())
-        self.assertTrue(set(core.LOCAL_INDEX_FILES).issubset(backup_names))
-        for name in core.LOCAL_INDEX_FILES:
-            self.assertFalse((destination / name).exists())
         self.assertEqual((destination / "auth.json").read_text(), "NEW-LOGIN")
         self.assertEqual((destination / "config.toml").read_text(), "new-machine=true")
         self.assertEqual(preserved_workspace.read_text(), "KEEP-WORKSPACE")
@@ -172,13 +152,12 @@ class TransferTests(unittest.TestCase):
             imported_state["electron-persisted-atom-state"]["chatgpt-conversation-resume-tokens-v1"]["new-private"]["token"],
             "SYNTHETIC-TARGET-VALUE",
         )
-        imported_rollouts = list((destination / "sessions").rglob("*.jsonl")) + list(
-            (destination / "archived_sessions").rglob("*.jsonl")
-        )
-        self.assertEqual(len(imported_rollouts), 2)
-        for rollout in imported_rollouts:
-            record = json.loads(rollout.read_text(encoding="utf-8"))
-            self.assertIn(str(new_home).lower(), record["payload"]["cwd"].lower())
+        db = sqlite3.connect(destination / "state_5.sqlite")
+        rows = db.execute("SELECT rollout_path, cwd FROM threads ORDER BY id").fetchall()
+        db.close()
+        for rollout, cwd in rows:
+            self.assertTrue(str(destination).lower() in rollout.lower())
+            self.assertTrue(str(new_home).lower() in cwd.lower())
 
     def test_import_requires_explicit_replacement_confirmation(self):
         package = self.base / "transfer.zip"
@@ -223,31 +202,6 @@ class TransferTests(unittest.TestCase):
         rewritten = self.base / "expanded-scope.zip"
         rogue_name = ".chatgpt-projects/project/source.txt"
         rogue_data = b"not allowed in lightweight packages"
-        with zipfile.ZipFile(package, "r") as source:
-            manifest = json.loads(source.read(core.MANIFEST_NAME))
-            manifest["payload_files"].append({
-                "path": rogue_name,
-                "size": len(rogue_data),
-                "sha256": hashlib.sha256(rogue_data).hexdigest(),
-            })
-            with zipfile.ZipFile(rewritten, "w") as target:
-                for info in source.infolist():
-                    if info.filename != core.MANIFEST_NAME:
-                        target.writestr(info, source.read(info.filename))
-                target.writestr(core.MANIFEST_NAME, json.dumps(manifest))
-                target.writestr(rogue_name, rogue_data)
-        result = core.verify_package(rewritten)
-        self.assertFalse(result["ok"])
-        self.assertEqual(result["disallowed"], [rogue_name])
-
-    def test_package_with_machine_local_database_is_rejected(self):
-        for name in core.LOCAL_INDEX_FILES:
-            self.assertFalse(core.is_allowed_payload_path(name), name)
-        package = self.base / "transfer.zip"
-        core.create_package(self.source, package)
-        rewritten = self.base / "database-payload.zip"
-        rogue_name = "state_5.sqlite"
-        rogue_data = b"synthetic machine database"
         with zipfile.ZipFile(package, "r") as source:
             manifest = json.loads(source.read(core.MANIFEST_NAME))
             manifest["payload_files"].append({
@@ -320,10 +274,10 @@ class TransferTests(unittest.TestCase):
             "Found 12 migratable files (3.5 MB); starting copy",
             "Copying sessions/example.jsonl (1/12, 0.0/3.5 MB)",
             "Hashing sessions/example.jsonl (1/12)",
-            "Packing sessions/example.jsonl (11/11)",
-            "Verifying sessions/example.jsonl",
-            "Inspecting paths in sessions/example.jsonl",
-            "Rewriting paths in sessions/example.jsonl",
+            "Packing state_5.sqlite (12/12)",
+            "Verifying state_5.sqlite",
+            "Inspecting paths in state_5.sqlite",
+            "Rewriting paths in state_5.sqlite",
             "Backing up sessions/example.jsonl",
             "Installing sessions/example.jsonl",
             "Package hash verification failed. Destination was not changed.",
