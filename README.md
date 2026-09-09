@@ -74,6 +74,7 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 底部的“进度与结果”框在两个页面中始终可见。Windows 路径中的 `/` 和 `\` 均可输入，工具会在界面和路径映射中统一转换为 `\`。
 
 中文界面会同时本地化弹窗、错误、进度日志、文件筛选器和路径来源说明；JSON 报告字段名保持英文，以维持机器可读格式兼容性。
+右上角语言选择显示为“中文简体”和“English”。
 
 工具不会扫描或打包 `.chatgpt-projects`，因此导出规模和之前的聊天迁移包接近。
 
@@ -175,6 +176,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 The progress/output panel remains visible below both tabs. Either `/` or `\` is accepted in Windows path fields; the GUI and path mapper normalize them to `\`.
 
 The selected GUI language also applies to dialogs, errors, progress messages, file filters, and path-source descriptions. JSON report field names remain stable in English for machine-readable compatibility.
+The language selector displays the user-facing names `中文简体` and `English`.
 
 The tool does not scan or package `.chatgpt-projects`, so export size remains close to the earlier conversation-only migration package.
 

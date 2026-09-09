@@ -154,6 +154,8 @@ TEXT = {
     },
 }
 
+LANGUAGE_CODES = {"中文简体": "zh", "English": "en"}
+
 
 def translation_key(widget_key: str) -> str:
     if widget_key == "package_import":
@@ -256,7 +258,7 @@ class CodexTransferApp:
         self.root.title("Codex Transfer")
         self.root.geometry("920x680")
         self.root.minsize(780, 590)
-        self.language = tk.StringVar(value="zh")
+        self.language = tk.StringVar(value="中文简体")
         self.source = tk.StringVar(value=str(core.default_codex_dir()))
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         default_package = application_directory() / f"Codex-Transfer-{stamp}.codextransfer.zip"
@@ -280,7 +282,10 @@ class CodexTransferApp:
         self.root.after(100, self._drain_events)
 
     def t(self, key: str) -> str:
-        return TEXT[self.language.get()][key]
+        return TEXT[self.language_code()][key]
+
+    def language_code(self) -> str:
+        return LANGUAGE_CODES.get(self.language.get(), "zh")
 
     def _label(self, parent: Any, key: str, **kwargs: Any) -> Any:
         widget = self.ttk.Label(parent, **kwargs)
@@ -309,7 +314,9 @@ class CodexTransferApp:
         header.pack(fill="x")
         self.widgets["title"] = ttk.Label(header, font=("Segoe UI", 20, "bold"))
         self.widgets["title"].pack(side="left")
-        language_box = ttk.Combobox(header, textvariable=self.language, values=("zh", "en"), state="readonly", width=5)
+        language_box = ttk.Combobox(
+            header, textvariable=self.language, values=tuple(LANGUAGE_CODES), state="readonly", width=10,
+        )
         language_box.pack(side="right")
         language_box.bind("<<ComboboxSelected>>", lambda _: self._translate())
         self.widgets["subtitle"] = ttk.Label(outer, foreground="#555555")
@@ -377,7 +384,7 @@ class CodexTransferApp:
         self.notebook.tab(self.import_page, text=self.t("import"))
         for key, widget in self.widgets.items():
             translated_key = translation_key(key)
-            if translated_key in TEXT[self.language.get()]:
+            if translated_key in TEXT[self.language_code()]:
                 widget.configure(text=self.t(translated_key))
         self.status.set(self.t("ready"))
         self.root.title(f"{self.t('title')} — {core.APP_VERSION}")
@@ -652,7 +659,7 @@ class CodexTransferApp:
                 kind, payload = self.events.get_nowait()
                 if kind == "progress":
                     message, fraction = payload
-                    self._append_log(localize_core_message(message, self.language.get()))
+                    self._append_log(localize_core_message(message, self.language_code()))
                     if fraction is not None:
                         self.progress_value.set(max(0, min(100, fraction * 100)))
                 elif kind == "success":
@@ -662,7 +669,7 @@ class CodexTransferApp:
                 elif kind == "error":
                     exc, details = payload
                     self._set_busy(False)
-                    visible_error = localize_core_message(str(exc), self.language.get())
+                    visible_error = localize_core_message(str(exc), self.language_code())
                     self._append_log(f"{self.t('error')}：{visible_error}")
                     messagebox.showerror(self.t("error"), visible_error)
         except queue.Empty:

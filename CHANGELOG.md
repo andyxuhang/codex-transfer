@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0 — 2026-09-09
+
+- Prepare the first public release from the completed migration workflow.
+- Replace technical language codes in the selector with `中文简体` and `English`.
+- Include all fixes and safety improvements developed through internal versions 1.0.0–1.0.9.
+
 ## 1.0.9 — 2026-09-09
 
 - Localize core migration errors and progress messages throughout the Chinese GUI, including the Codex-not-closed dialog.

@@ -202,17 +202,17 @@ class TransferTests(unittest.TestCase):
 
     def test_windows_paths_are_normalized_before_mapping(self):
         self.assertEqual(
-            core.normalize_path_text("D:/Users/Andy Xu/Desktop/Codex-Transfer.zip"),
-            r"D:\Users\Andy Xu\Desktop\Codex-Transfer.zip",
+            core.normalize_path_text("D:/Users/Example User/Desktop/Codex-Transfer.zip"),
+            r"D:\Users\Example User\Desktop\Codex-Transfer.zip",
         )
-        self.assertEqual(core.normalize_path_text('"C:/Users/Andy Xu/.codex"'), r"C:\Users\Andy Xu\.codex")
+        self.assertEqual(core.normalize_path_text('"C:/Users/Example User/.codex"'), r"C:\Users\Example User\.codex")
         self.assertEqual(core.normalize_path_text("C:/"), "C:\\")
         maps = core.parse_path_maps([
-            ("C:/Users/Andy Xu/Documents/Codex", "D:/Users/Andy Xu/Documents/Codex"),
+            ("C:/Users/Example User/Documents/Codex", "D:/Users/Example User/Documents/Codex"),
         ])
         self.assertEqual(
-            core.replace_path_prefix(r"C:\Users\Andy Xu\Documents\Codex\Project", maps),
-            r"D:\Users\Andy Xu\Documents\Codex\Project",
+            core.replace_path_prefix(r"C:\Users\Example User\Documents\Codex\Project", maps),
+            r"D:\Users\Example User\Documents\Codex\Project",
         )
         automatic = core.automatic_path_maps(
             {
@@ -245,6 +245,7 @@ class TransferTests(unittest.TestCase):
                 self.assertTrue(gui.TEXT[language][key].strip(), f"Missing {language} caption for {key}")
 
     def test_gui_language_tables_and_core_messages_are_bilingual(self):
+        self.assertEqual(gui.LANGUAGE_CODES, {"中文简体": "zh", "English": "en"})
         self.assertEqual(set(gui.TEXT["zh"]), set(gui.TEXT["en"]))
         samples = (
             "Close Codex/ChatGPT Desktop before exporting: Codex.exe",
