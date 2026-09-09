@@ -8,6 +8,7 @@ import json
 import queue
 import sys
 import threading
+import time
 import traceback
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -110,6 +111,7 @@ class CodexTransferApp:
         self.status = tk.StringVar(value=TEXT["zh"]["ready"])
         self.progress_value = tk.DoubleVar(value=0)
         self.events: queue.Queue[tuple[str, Any]] = queue.Queue()
+        self._last_progress_event_at = 0.0
         self.widgets: dict[str, Any] = {}
         self.busy_buttons: list[Any] = []
         self._build()
@@ -278,10 +280,18 @@ class CodexTransferApp:
     def _append_log(self, message: str) -> None:
         self.log.configure(state="normal")
         self.log.insert("end", message.rstrip() + "\n")
+        line_count = int(self.log.index("end-1c").split(".", 1)[0])
+        if line_count > 2500:
+            self.log.delete("1.0", "501.0")
         self.log.see("end")
         self.log.configure(state="disabled")
 
     def _progress(self, message: str, fraction: Optional[float]) -> None:
+        now = time.monotonic()
+        force = fraction is None or fraction is not None and fraction >= 1.0
+        if not force and now - self._last_progress_event_at < 0.15:
+            return
+        self._last_progress_event_at = now
         self.events.put(("progress", (message, fraction)))
 
     def _run(self, function: Callable[[], Any], success: Callable[[Any], None]) -> None:
@@ -297,7 +307,7 @@ class CodexTransferApp:
     def _drain_events(self) -> None:
         from tkinter import messagebox
         try:
-            while True:
+            for _ in range(50):
                 kind, payload = self.events.get_nowait()
                 if kind == "progress":
                     message, fraction = payload

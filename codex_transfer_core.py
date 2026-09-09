@@ -22,7 +22,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Optional
 
 
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 FORMAT_NAME = "codex-transfer-package"
 FORMAT_VERSION = 1
 MANIFEST_NAME = "codex-transfer-manifest.json"
@@ -224,28 +224,50 @@ def source_inventory(source: Path) -> dict[str, Any]:
 
 
 def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> list[str]:
-    candidates: list[tuple[Path, Path]] = []
+    candidates: list[tuple[Path, Path, int]] = []
     skipped_regenerable = 0
+    scanned = 0
+    progress("Scanning migratable files; large managed workspaces may take a moment", 0.01)
     for dirname in DATA_DIRS:
         root = source / dirname
         for src in iter_files(root):
+            scanned += 1
             relative = src.relative_to(source)
             if is_regenerable_workspace_path(relative):
                 skipped_regenerable += 1
                 continue
-            candidates.append((src, stage / relative))
+            try:
+                size = src.stat().st_size
+            except OSError as exc:
+                raise TransferError(f"Unable to inspect source file: {src}: {exc}") from exc
+            candidates.append((src, stage / relative, size))
+            if scanned % 1000 == 0:
+                progress(f"Scanning source: {scanned:,} files checked", 0.01)
     for filename in PLAIN_FILES:
         src = source / filename
         if src.is_file():
-            candidates.append((src, stage / filename))
+            candidates.append((src, stage / filename, src.stat().st_size))
 
     global_state = source / GLOBAL_STATE_FILE
     total = max(len(candidates) + len(DATABASE_FILES) + int(global_state.is_file()), 1)
+    total_bytes = sum(item[2] for item in candidates)
     done = 0
-    for src, dst in candidates:
+    copied_bytes = 0
+    progress(
+        f"Found {len(candidates):,} migratable files ({total_bytes / 1024 / 1024:.1f} MB); starting copy",
+        0.02,
+    )
+    for src, dst, size in candidates:
+        relative = src.relative_to(source)
+        fraction = copied_bytes / max(total_bytes, 1)
+        progress(
+            f"Copying {relative} ({done + 1:,}/{len(candidates):,}, {copied_bytes / 1024 / 1024:.1f}/{total_bytes / 1024 / 1024:.1f} MB)",
+            0.02 + fraction * 0.53,
+        )
         copy2_resilient(src, dst)
         done += 1
-        progress(f"Copying {src.relative_to(source)}", done / total * 0.55)
+        copied_bytes += size
+    progress(f"Copied {done:,} files ({copied_bytes / 1024 / 1024:.1f} MB)", 0.55)
     warnings = []
     if skipped_regenerable:
         message = (
@@ -302,8 +324,8 @@ def create_package(
         staged_files = sorted(iter_files(stage), key=lambda p: p.relative_to(stage).as_posix().lower())
         for index, path in enumerate(staged_files, 1):
             relative = path.relative_to(stage).as_posix()
+            progress(f"Hashing {relative} ({index:,}/{len(staged_files):,})", 0.55 + ((index - 1) / max(len(staged_files), 1)) * 0.20)
             entries.append({"path": relative, "size": path.stat().st_size, "sha256": sha256_file(path)})
-            progress(f"Hashing {relative}", 0.55 + (index / max(len(staged_files), 1)) * 0.20)
         manifest = {
             "format": FORMAT_NAME,
             "format_version": FORMAT_VERSION,
@@ -323,8 +345,8 @@ def create_package(
         try:
             with zipfile.ZipFile(partial, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as archive:
                 for index, path in enumerate(sorted(iter_files(stage)), 1):
+                    progress(f"Packing {path.relative_to(stage)} ({index:,}/{len(entries) + 1:,})", 0.78 + (index - 1) / max(len(entries) + 1, 1) * 0.21)
                     archive.write(path, path.relative_to(stage).as_posix())
-                    progress(f"Packing {path.relative_to(stage)}", 0.78 + index / max(len(entries) + 1, 1) * 0.21)
             os.replace(partial, package)
         except Exception:
             partial.unlink(missing_ok=True)

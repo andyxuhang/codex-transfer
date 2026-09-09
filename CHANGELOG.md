@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3 — 2026-09-09
+
+- Prevent the Tkinter window from appearing frozen when exporting workspaces containing tens of thousands of files.
+- Throttle per-file GUI events, cap retained log lines, and bound each UI event-drain cycle.
+- Show explicit scanning, file-count, data-size, copy, hashing, and pre-compression progress messages.
+
 ## 1.0.2 — 2026-09-09
 
 - Avoid Windows `WinError 3` failures on deeply nested managed-workspace files by using extended-length paths and bounded copy retries.

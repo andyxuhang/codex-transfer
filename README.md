@@ -70,6 +70,8 @@ A safe, replacement-only Windows migration utility for local Codex and ChatGPT D
 
 底部的“进度与结果”框在两个页面中始终可见。Windows 路径中的 `/` 和 `\` 均可输入，工具会在界面和路径映射中统一转换为 `\`。
 
+大型托管工作区可能包含数 GB、数万个文件。导出页面会分别显示扫描、复制、哈希和压缩阶段；处理大文件时请等待当前阶段完成，不要重复点击按钮。
+
 ### 命令行（可选）
 
 ```powershell
@@ -161,6 +163,8 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 8. Keep the backup and result JSON while checking chats, sections, and automations in Codex.
 
 The progress/output panel remains visible below both tabs. Either `/` or `\` is accepted in Windows path fields; the GUI and path mapper normalize them to `\`.
+
+Large managed workspaces can contain several gigabytes and tens of thousands of files. Export reports separate scanning, copying, hashing, and packing stages; allow the current stage to finish when a large file is being processed.
 
 ### Important limitations
 
