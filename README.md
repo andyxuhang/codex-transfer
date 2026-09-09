@@ -60,21 +60,23 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 
 ### 图形界面使用方法
 
-1. 下载仓库或 Release ZIP。
-2. 双击 `run_codex_transfer.cmd`。
+1. 普通用户从 Release 下载 `Codex-Transfer.exe`，无需安装 Python，直接双击运行。
+2. 如果使用源码版，则下载 Release ZIP 并双击 `run_codex_transfer.cmd`。
 3. 顶部状态条每秒检查一次 Codex/ChatGPT：红色表示仍在运行，绿色表示已经完全关闭。
 4. 在蓝色“旧电脑：导出”页面选择 `.codex` 数据目录和迁移包位置，点击“扫描”，然后“创建迁移包”。默认保存在工具所在文件夹，文件名带时间，不再猜测本地化或重定向的桌面路径。
 5. 把整个迁移包复制到新电脑。
 6. 在新电脑打开本工具，切换到橙色“新电脑：覆盖导入”页面，选择迁移包和目标 `.codex`，点击“校验迁移包”。
 7. 点击“查看并设置路径映射”。独立窗口只读取结构化路径字段，不扫描聊天正文；深层引用会归并为安全的顶级根目录。
 8. 对找不到的项目根目录选择新位置；也可以明确保持原路径或暂不处理。用户名和 `.codex` 目录变化仍会自动映射。
-8. 确认状态条变绿，勾选覆盖确认框，点击“备份并覆盖导入”。
-9. 保存备份和结果 JSON，启动 Codex 检查聊天、分区和自动任务。
+9. 确认状态条变绿，勾选覆盖确认框，点击“备份并覆盖导入”。
+10. 保存备份和结果 JSON，启动 Codex 检查聊天、分区和自动任务。
 
 底部的“进度与结果”框在两个页面中始终可见。Windows 路径中的 `/` 和 `\` 均可输入，工具会在界面和路径映射中统一转换为 `\`。
 
 中文界面会同时本地化弹窗、错误、进度日志、文件筛选器和路径来源说明；JSON 报告字段名保持英文，以维持机器可读格式兼容性。
 右上角语言选择显示为“中文简体”和“English”。
+
+公开 EXE 由本仓库的 GitHub Actions 从 `v1.0` 源码自动构建，并同时发布 SHA-256 文件。当前社区版本未进行商业代码签名；如 Windows 显示来源提醒，请先核对 Release 来源和 SHA-256，也可以直接运行公开源码。
 
 工具不会扫描或打包 `.chatgpt-projects`，因此导出规模和之前的聊天迁移包接近。
 
@@ -162,21 +164,23 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 
 ### GUI workflow
 
-1. Download the repository or release ZIP.
-2. Double-click `run_codex_transfer.cmd`.
+1. Most users can download `Codex-Transfer.exe` from Releases and run it without installing Python.
+2. For the source version, download the Release ZIP and double-click `run_codex_transfer.cmd`.
 3. The top status bar checks every second: red means Codex/ChatGPT is running; green means it is fully closed.
 4. On the blue **Old PC: Export** tab, select the `.codex` directory and a package path. Scan, then create the package. The default is a timestamped file beside the tool, avoiding localized or redirected Desktop folders.
 5. Copy the package to the new PC.
 6. On the new PC, open the orange **New PC: Replace import** tab, select and verify the package, then select the destination `.codex` directory.
 7. Click **Review and set path maps**. The separate window reads structured path fields only, not chat prose, and groups deep references under safe top-level roots.
 8. Choose a new location for missing project roots, explicitly keep an old path, or leave it unresolved. User-home and `.codex` changes remain automatic.
-8. Wait for the status bar to turn green, accept the replacement confirmation, and start the import.
-9. Keep the backup and result JSON while checking chats, sections, and automations in Codex.
+9. Wait for the status bar to turn green, accept the replacement confirmation, and start the import.
+10. Keep the backup and result JSON while checking chats, sections, and automations in Codex.
 
 The progress/output panel remains visible below both tabs. Either `/` or `\` is accepted in Windows path fields; the GUI and path mapper normalize them to `\`.
 
 The selected GUI language also applies to dialogs, errors, progress messages, file filters, and path-source descriptions. JSON report field names remain stable in English for machine-readable compatibility.
 The language selector displays the user-facing names `中文简体` and `English`.
+
+The public EXE is built automatically from the `v1.0` source by this repository's GitHub Actions workflow and is published with a SHA-256 file. The community build is not commercially code-signed; verify the Release source and checksum if Windows displays an origin warning, or run the public source directly.
 
 The tool does not scan or package `.chatgpt-projects`, so export size remains close to the earlier conversation-only migration package.
 
