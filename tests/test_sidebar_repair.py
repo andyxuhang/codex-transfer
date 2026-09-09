@@ -86,6 +86,23 @@ class SidebarRepairTests(unittest.TestCase):
             for key, width in widths.items():
                 self.assertLessEqual(len(gui.TEXT[language][key]), width, (language, key))
 
+    @unittest.skipUnless(sys.platform == "win32", "real Tk window construction is tested on Windows")
+    def test_real_gui_window_can_be_constructed(self):
+        with mock.patch.object(gui.transfer, "codex_processes", return_value=[]), mock.patch.object(
+            gui.core, "discover_codex_profiles", return_value=[]
+        ):
+            try:
+                app = gui.SidebarRepairApp()
+            except Exception as exc:
+                if "init.tcl" in str(exc):
+                    self.skipTest("the local embedded Python runtime does not include Tcl/Tk")
+                raise
+            try:
+                app.root.update_idletasks()
+                self.assertTrue(app.root.winfo_exists())
+            finally:
+                app.root.destroy()
+
 
 if __name__ == "__main__":
     unittest.main()

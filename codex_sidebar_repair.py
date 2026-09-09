@@ -161,7 +161,14 @@ class SidebarRepairApp:
         ttk.Entry(form, textvariable=self.backup_dir).grid(row=2, column=1, sticky="ew", pady=6)
         self.widgets["browse"] = ttk.Button(form, command=self._browse_backup, width=11)
         self.widgets["browse"].grid(row=2, column=2, padx=(8, 0), pady=6)
-        self.widgets["confirm"] = ttk.Checkbutton(form, variable=self.confirmed, command=self._update_repair_state, wraplength=690)
+        self.widgets["confirm"] = tk.Checkbutton(
+            form,
+            variable=self.confirmed,
+            command=self._update_repair_state,
+            anchor="w",
+            justify="left",
+            wraplength=690,
+        )
         self.widgets["confirm"].grid(row=3, column=0, columnspan=3, sticky="w", pady=(10, 6))
         buttons = ttk.Frame(form)
         buttons.grid(row=4, column=0, columnspan=3, sticky="e", pady=(5, 0))

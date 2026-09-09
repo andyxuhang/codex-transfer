@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 — 2026-09-09
+
+- Fix Codex Sidebar Repair failing at startup because `ttk.Checkbutton` does not support the `wraplength` option.
+- Use the Tk checkbutton implementation so long English and Chinese confirmation text still wraps correctly.
+- Add a Windows GUI-construction regression test that creates and destroys the real repair window.
+
 ## 1.2.0 — 2026-09-09
 
 - Add a separate bilingual Codex Sidebar Repair GUI and CLI for stale, already-deleted sidebar entries.

@@ -16,7 +16,7 @@ from typing import Any, Callable, Iterable, Optional
 import codex_transfer_core as transfer
 
 
-REPAIR_VERSION = "1.2.0"
+REPAIR_VERSION = "1.2.1"
 BACKUP_FORMAT = "codex-sidebar-cache-backup"
 CACHE_DIRECTORIES = (
     "Cache",

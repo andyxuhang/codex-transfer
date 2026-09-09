@@ -1,6 +1,8 @@
-# Codex Transfer 1.2.0
+# Codex Transfer 1.2.1
 
 This release adds a separate, safety-focused utility for repairing stale Codex Desktop sidebar entries.
+
+Version 1.2.1 fixes the repair window startup failure in 1.2.0 and adds a real Windows window-construction test.
 
 ## New: Codex Sidebar Repair
 
@@ -21,9 +23,11 @@ The tool does not delete by title. Cloud conversations that still exist on the a
 
 ---
 
-# Codex 迁移工具 1.2.0
+# Codex 迁移工具 1.2.1
 
 此版本新增一个独立、安全优先的工具，用于修复 Codex Desktop 侧栏中的无效残留条目。
+
+1.2.1 修复了 1.2.0 侧栏修复窗口无法启动的问题，并增加了在 Windows 上真实创建窗口的回归测试。
 
 ## 新增：Codex 侧栏修复
 
