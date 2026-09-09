@@ -134,6 +134,14 @@ TEXT = {
 }
 
 
+def translation_key(widget_key: str) -> str:
+    if widget_key == "package_import":
+        return "package"
+    if widget_key.endswith("_browse"):
+        return "browse"
+    return widget_key
+
+
 class CodexTransferApp:
     def __init__(self) -> None:
         import tkinter as tk
@@ -265,7 +273,7 @@ class CodexTransferApp:
         self.notebook.tab(self.export_page, text=self.t("export"))
         self.notebook.tab(self.import_page, text=self.t("import"))
         for key, widget in self.widgets.items():
-            translated_key = "package" if key == "package_import" else (key[:-7] if key.endswith("_browse") else key)
+            translated_key = translation_key(key)
             if translated_key in TEXT[self.language.get()]:
                 widget.configure(text=self.t(translated_key))
         self.status.set(self.t("ready"))

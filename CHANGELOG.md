@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.8 — 2026-09-09
+
+- Fix all file/folder picker buttons incorrectly showing their adjacent field labels instead of the short Browse caption.
+- Add a bilingual regression test for every fixed-width Browse button.
+
 ## 1.0.7 — 2026-09-09
 
 - Add a separate path-review window that discovers structured path references without scanning chat prose.

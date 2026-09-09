@@ -10,6 +10,7 @@ from unittest import mock
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import codex_transfer_core as core
+import codex_transfer as gui
 
 
 THREAD_A = "11111111-1111-4111-8111-111111111111"
@@ -227,6 +228,21 @@ class TransferTests(unittest.TestCase):
             core.replace_path_prefix(r"C:\Users\Old User\Desktop\Project", keep_original),
             r"C:\Users\Old User\Desktop\Project",
         )
+
+    def test_browse_buttons_always_use_short_browse_caption(self):
+        for key in ("source_browse", "package_browse", "package_import_browse", "destination_browse"):
+            self.assertEqual(gui.translation_key(key), "browse")
+            self.assertLessEqual(len(gui.TEXT["zh"][gui.translation_key(key)]), 11)
+            self.assertLessEqual(len(gui.TEXT["en"][gui.translation_key(key)]), 11)
+        self.assertEqual(gui.translation_key("package_import"), "package")
+        button_keys = (
+            "browse", "scan", "create", "open_package_folder", "inspect_paths",
+            "verify", "apply", "choose_new_path", "keep_old_path", "clear_path",
+            "apply_path_maps",
+        )
+        for language in ("zh", "en"):
+            for key in button_keys:
+                self.assertTrue(gui.TEXT[language][key].strip(), f"Missing {language} caption for {key}")
 
     def test_package_path_inspection_groups_roots_without_reading_chat_text(self):
         external = r"D:\ESP32\AeroMeter"
