@@ -4,9 +4,9 @@
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A safe, replacement-only Windows migration utility for local Codex and ChatGPT Desktop data.
+A focused, replacement-only Windows migration utility for local Codex and ChatGPT Desktop conversations and their UI metadata.
 
-用于在 Windows 电脑之间安全迁移本地 Codex / ChatGPT Desktop 数据的图形工具，仅支持覆盖，不支持合并。
+用于在 Windows 电脑之间安全迁移本地 Codex / ChatGPT Desktop 聊天及其界面元数据的图形工具，仅支持覆盖，不支持合并。
 
 > **Unofficial community tool / 非官方社区工具**
 > Codex Transfer is not affiliated with or supported by OpenAI. Local Codex formats may change between app versions. Always retain the generated backup and migration package until the destination has been verified.
@@ -16,12 +16,10 @@ A safe, replacement-only Windows migration utility for local Codex and ChatGPT D
 ### 能迁移什么
 
 - 本地聊天与 Work 任务：`sessions`、`archived_sessions`
-- 会话附件和生成内容
-- SQLite 中的线程、项目、分区归属、排序及历史元数据
+- 会话附件
+- `state_5.sqlite` 中的线程、项目路径和分区归属
 - 自定义侧栏分区、置顶状态和界面布局数据
 - 自动任务及其定时计划：`automations/*/automation.toml`
-- Codex 管理的本地工作目录：`.chatgpt-projects`
-- 用户规则、记忆、自定义技能和导入数据
 - 不同用户名、盘符和项目根目录的路径映射
 
 ### 永远不会迁移什么
@@ -33,7 +31,8 @@ A safe, replacement-only Windows migration utility for local Codex and ChatGPT D
 - `config.toml` 中的机器专用配置
 - `installation_id` 和设备身份
 - 插件运行时、缓存、日志、sandbox、锁和临时文件
-- 托管工作目录中可重新下载的 `.android-build-tools` 构建工具缓存
+- `.chatgpt-projects` 托管工作目录、项目源码和构建输出
+- 生成图片、记忆、规则、自定义技能及第三方导入目录
 - `.codex` 外部的 Git 仓库、OneDrive 文件夹和项目源码
 
 外部项目源码请用 Git、OneDrive 或移动硬盘单独迁移，然后在工具中添加旧路径到新路径的映射。
@@ -46,7 +45,7 @@ A safe, replacement-only Windows migration utility for local Codex and ChatGPT D
 - 导入前把目标电脑的全部可迁移数据备份为 ZIP。
 - 只清除明确白名单中的可迁移数据，目标电脑的登录状态和机器配置保留。
 - 所有路径改写均在临时 staging 目录完成，不修改迁移包。
-- 深层项目文件使用 Windows 扩展长度路径复制；短暂占用会自动重试，真正的项目文件失败不会被静默忽略。
+- 只覆盖聊天相关白名单数据；目标电脑中的工作目录、规则、记忆和技能保持不变。
 - 安装中途失败会自动恢复导入前备份。
 - 导入后自动核对数据库线程数、JSONL 数量和每个 `rollout_path`。
 
@@ -70,7 +69,7 @@ A safe, replacement-only Windows migration utility for local Codex and ChatGPT D
 
 底部的“进度与结果”框在两个页面中始终可见。Windows 路径中的 `/` 和 `\` 均可输入，工具会在界面和路径映射中统一转换为 `\`。
 
-大型托管工作区可能包含数 GB、数万个文件。导出页面会分别显示扫描、复制、哈希和压缩阶段；处理大文件时请等待当前阶段完成，不要重复点击按钮。
+工具不会扫描或打包 `.chatgpt-projects`，因此导出规模和之前的聊天迁移包接近。
 
 ### 命令行（可选）
 
@@ -110,12 +109,10 @@ C:\Users\<用户名>\CodexTransferBackups\before-import-YYYYMMDD-HHMMSS.zip
 ### What it transfers
 
 - Local chats and Work tasks in `sessions` and `archived_sessions`
-- Attachments and generated content
-- Thread, project, section assignment, ordering, and history metadata stored in SQLite
+- Conversation attachments
+- Thread paths and section assignments stored in `state_5.sqlite`
 - Custom sidebar sections, pins, and layout state
 - Automations and schedules from `automations/*/automation.toml`
-- Codex-managed local workspaces in `.chatgpt-projects`
-- User rules, memories, custom skills, and imported data
 - Automatic user-home and `.codex` path migration, plus custom path-prefix maps
 
 ### What it never transfers
@@ -127,7 +124,8 @@ These items are hard-coded exclusions to prevent credential or device-identity m
 - Machine-specific `config.toml`
 - `installation_id` and device identity
 - Plugin runtimes, caches, logs, sandboxes, locks, and temporary files
-- Regenerable `.android-build-tools` downloads inside managed workspaces
+- Managed workspace contents under `.chatgpt-projects`, project source, and build output
+- Generated images, memories, rules, custom skills, and vendor-import directories
 - Git repositories, OneDrive folders, and source trees outside `.codex`
 
 Move external workspaces separately with Git, cloud storage, or removable media, then add old-to-new path maps in Codex Transfer.
@@ -140,7 +138,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 - All migratable destination data is backed up before replacement.
 - Only allowlisted user-data paths are cleared. Destination credentials and machine configuration remain intact.
 - Path rewriting happens in a temporary staging directory and never changes the package.
-- Deep project files use Windows extended-length paths; transient copy failures are retried and real project-file failures are never silently ignored.
+- Only the conversation-data allowlist is replaced; destination workspaces, rules, memories, and skills remain untouched.
 - An interrupted installation attempts to restore the pre-import backup automatically.
 - Post-import validation compares database threads with JSONL sessions and checks every rollout path.
 
@@ -164,7 +162,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 
 The progress/output panel remains visible below both tabs. Either `/` or `\` is accepted in Windows path fields; the GUI and path mapper normalize them to `\`.
 
-Large managed workspaces can contain several gigabytes and tens of thousands of files. Export reports separate scanning, copying, hashing, and packing stages; allow the current stage to finish when a large file is being processed.
+The tool does not scan or package `.chatgpt-projects`, so export size remains close to the earlier conversation-only migration package.
 
 ### Important limitations
 

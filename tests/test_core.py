@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sqlite3
 import tempfile
 import unittest
@@ -97,10 +98,12 @@ class TransferTests(unittest.TestCase):
         self.assertNotIn(".env", names)
         self.assertNotIn("config.toml", names)
         self.assertNotIn("skills/.system/SYSTEM.md", names)
-        self.assertIn("skills/custom/SKILL.md", names)
+        self.assertNotIn("skills/custom/SKILL.md", names)
+        self.assertNotIn(".chatgpt-projects/managed/work.txt", names)
+        self.assertNotIn("rules/default.rules", names)
         self.assertIn("automations/daily/automation.toml", names)
         self.assertNotIn(".chatgpt-projects/g-p-cache/.android-build-tools/cmd-stage/downloaded.jar", names)
-        self.assertTrue(any("Android build-tool cache" in warning for warning in manifest["export_warnings"]))
+        self.assertEqual(manifest["export_warnings"], [])
         with zipfile.ZipFile(package, "r") as archive:
             exported_state = archive.read(core.GLOBAL_STATE_FILE).decode("utf-8")
         self.assertNotIn("SYNTHETIC-SOURCE-VALUE", exported_state)
@@ -114,6 +117,12 @@ class TransferTests(unittest.TestCase):
         existing = destination / "sessions" / "old.jsonl"
         existing.parent.mkdir()
         existing.write_text("{}\n", encoding="utf-8")
+        preserved_workspace = destination / ".chatgpt-projects" / "keep" / "source.txt"
+        preserved_workspace.parent.mkdir(parents=True)
+        preserved_workspace.write_text("KEEP-WORKSPACE", encoding="utf-8")
+        preserved_rule = destination / "rules" / "keep.rules"
+        preserved_rule.parent.mkdir()
+        preserved_rule.write_text("KEEP-RULE", encoding="utf-8")
         new_profile = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
         target_state = {"electron-persisted-atom-state": {
             "sidebar-custom-sections-v3": {new_profile: {"sections": []}},
@@ -132,6 +141,8 @@ class TransferTests(unittest.TestCase):
         self.assertTrue(Path(result["backup"]).is_file())
         self.assertEqual((destination / "auth.json").read_text(), "NEW-LOGIN")
         self.assertEqual((destination / "config.toml").read_text(), "new-machine=true")
+        self.assertEqual(preserved_workspace.read_text(), "KEEP-WORKSPACE")
+        self.assertEqual(preserved_rule.read_text(), "KEEP-RULE")
         imported_state = json.loads((destination / ".codex-global-state.json").read_text(encoding="utf-8"))
         sidebar = imported_state["electron-persisted-atom-state"]["sidebar-custom-sections-v3"]
         self.assertIn(new_profile, sidebar)
@@ -164,6 +175,29 @@ class TransferTests(unittest.TestCase):
                     data = b"tampered"
                 target.writestr(info, data)
         self.assertFalse(core.verify_package(rewritten)["ok"])
+
+    def test_package_with_managed_workspace_payload_is_rejected(self):
+        package = self.base / "transfer.zip"
+        core.create_package(self.source, package)
+        rewritten = self.base / "expanded-scope.zip"
+        rogue_name = ".chatgpt-projects/project/source.txt"
+        rogue_data = b"not allowed in lightweight packages"
+        with zipfile.ZipFile(package, "r") as source:
+            manifest = json.loads(source.read(core.MANIFEST_NAME))
+            manifest["payload_files"].append({
+                "path": rogue_name,
+                "size": len(rogue_data),
+                "sha256": hashlib.sha256(rogue_data).hexdigest(),
+            })
+            with zipfile.ZipFile(rewritten, "w") as target:
+                for info in source.infolist():
+                    if info.filename != core.MANIFEST_NAME:
+                        target.writestr(info, source.read(info.filename))
+                target.writestr(core.MANIFEST_NAME, json.dumps(manifest))
+                target.writestr(rogue_name, rogue_data)
+        result = core.verify_package(rewritten)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["disallowed"], [rogue_name])
 
     def test_windows_paths_are_normalized_before_mapping(self):
         self.assertEqual(

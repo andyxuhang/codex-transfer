@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 — 2026-09-09
+
+- Return to the proven conversation-only migration scope: sessions, archived sessions, attachments, session index, and `state_5.sqlite`.
+- Add automations plus sanitized sidebar section, pin, expansion, and ordering state to that lightweight scope.
+- Never scan, export, delete, or install `.chatgpt-projects`, project source/build output, generated images, memories, rules, custom skills, or vendor-import data.
+- Reject older expanded-scope packages containing out-of-scope payloads instead of partially applying them.
+
 ## 1.0.3 — 2026-09-09
 
 - Prevent the Tkinter window from appearing frozen when exporting workspaces containing tens of thousands of files.

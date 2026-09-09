@@ -22,7 +22,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Optional
 
 
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 FORMAT_NAME = "codex-transfer-package"
 FORMAT_VERSION = 1
 MANIFEST_NAME = "codex-transfer-manifest.json"
@@ -34,12 +34,6 @@ DATA_DIRS = (
     "archived_sessions",
     "attachments",
     "automations",
-    ".chatgpt-projects",
-    "generated_images",
-    "memories",
-    "rules",
-    "skills",
-    "vendor_imports",
 )
 PLAIN_FILES = (
     "session_index.jsonl",
@@ -47,9 +41,6 @@ PLAIN_FILES = (
 GLOBAL_STATE_FILE = ".codex-global-state.json"
 DATABASE_FILES = (
     "state_5.sqlite",
-    "thread_history_1.sqlite",
-    "goals_1.sqlite",
-    "memories_1.sqlite",
 )
 DATABASE_SIDE_SUFFIXES = ("-wal", "-shm")
 PATH_FIELD_NAMES = {
@@ -79,10 +70,11 @@ EXCLUDED_LABELS = (
     "config.toml / machine-specific configuration",
     "installation_id / device identity",
     "plugins, cache, logs, sandbox and temporary runtime files",
+    "managed workspace contents (.chatgpt-projects), project source and build output",
+    "generated images, memories, rules, custom skills and vendor imports",
     "external repositories and OneDrive workspaces",
 )
 SAFE_AUTOMATION_ID = re.compile(r"^[A-Za-z0-9._-]+$")
-REGENERABLE_WORKSPACE_DIRS = {".android-build-tools"}
 
 Progress = Callable[[str, Optional[float]], None]
 
@@ -143,14 +135,6 @@ def iter_files(root: Path) -> Iterable[Path]:
 
 def count_files(root: Path) -> int:
     return sum(1 for _ in iter_files(root))
-
-
-def is_regenerable_workspace_path(relative: Path) -> bool:
-    """Return true only for known downloaded caches inside managed workspaces."""
-    parts = tuple(part.casefold() for part in relative.parts)
-    return bool(parts and parts[0] == ".chatgpt-projects" and any(
-        part in REGENERABLE_WORKSPACE_DIRS for part in parts[1:]
-    ))
 
 
 def windows_extended_path(path: Path) -> str:
@@ -225,17 +209,13 @@ def source_inventory(source: Path) -> dict[str, Any]:
 
 def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> list[str]:
     candidates: list[tuple[Path, Path, int]] = []
-    skipped_regenerable = 0
     scanned = 0
-    progress("Scanning migratable files; large managed workspaces may take a moment", 0.01)
+    progress("Scanning conversations, attachments, and automations", 0.01)
     for dirname in DATA_DIRS:
         root = source / dirname
         for src in iter_files(root):
             scanned += 1
             relative = src.relative_to(source)
-            if is_regenerable_workspace_path(relative):
-                skipped_regenerable += 1
-                continue
             try:
                 size = src.stat().st_size
             except OSError as exc:
@@ -269,13 +249,6 @@ def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> list
         copied_bytes += size
     progress(f"Copied {done:,} files ({copied_bytes / 1024 / 1024:.1f} MB)", 0.55)
     warnings = []
-    if skipped_regenerable:
-        message = (
-            f"Skipped {skipped_regenerable} regenerable Android build-tool cache files "
-            "inside managed workspaces (.android-build-tools)."
-        )
-        warnings.append(message)
-        progress("Warning: " + message, None)
     if global_state.is_file():
         sanitized = sanitize_global_state(global_state)
         (stage / GLOBAL_STATE_FILE).write_text(
@@ -387,6 +360,7 @@ def verify_package(package: Path, progress: Progress = noop_progress) -> dict[st
     missing: list[str] = []
     changed: list[dict[str, Any]] = []
     unexpected: list[str] = []
+    disallowed = sorted(name for name in expected if not is_allowed_payload_path(name))
     with zipfile.ZipFile(package, "r") as archive:
         actual = {info.filename: info for info in archive.infolist() if not info.is_dir() and info.filename != MANIFEST_NAME}
         for index, (name, item) in enumerate(expected.items(), 1):
@@ -403,15 +377,26 @@ def verify_package(package: Path, progress: Progress = noop_progress) -> dict[st
                 changed.append({"path": name, "expected_size": item.get("size"), "actual_size": info.file_size})
         unexpected = sorted(set(actual) - set(expected))
     result = {
-        "ok": not missing and not changed and not unexpected,
+        "ok": not missing and not changed and not unexpected and not disallowed,
         "file_count": len(expected),
         "missing": missing,
         "changed": changed,
         "unexpected": unexpected,
+        "disallowed": disallowed,
         "manifest": manifest,
     }
     progress("Package verified" if result["ok"] else "Package verification failed", 1.0)
     return result
+
+
+def is_allowed_payload_path(name: str) -> bool:
+    pure = _safe_zip_name(name)
+    root = pure.parts[0].casefold()
+    allowed_dirs = {item.casefold() for item in DATA_DIRS}
+    allowed_files = {item.casefold() for item in PLAIN_FILES + (GLOBAL_STATE_FILE,) + DATABASE_FILES}
+    if len(pure.parts) == 1:
+        return root in allowed_files
+    return root in allowed_dirs
 
 
 def extract_verified_package(package: Path, target: Path, manifest: dict[str, Any]) -> None:
