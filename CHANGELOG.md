@@ -1,20 +1,5 @@
 # Changelog
 
-## 1.2.1 — 2026-09-09
-
-- Fix Codex Sidebar Repair failing at startup because `ttk.Checkbutton` does not support the `wraplength` option.
-- Use the Tk checkbutton implementation so long English and Chinese confirmation text still wraps correctly.
-- Add a Windows GUI-construction regression test that creates and destroys the real repair window.
-
-## 1.2.0 — 2026-09-09
-
-- Add a separate bilingual Codex Sidebar Repair GUI and CLI for stale, already-deleted sidebar entries.
-- Detect the Windows Codex Desktop web profile without reading cached chat titles or message text.
-- Scan local thread metadata read-only and distinguish missing rollout records from unreferenced JSONL files, which are never deleted.
-- Back up and transactionally remove only allowlisted rebuildable web/cache directories while preserving the browser cookie store.
-- Require explicit confirmation and a fully closed Codex/ChatGPT Desktop process before repair.
-- Build and attest `Codex-Sidebar-Repair.exe` alongside the migration executable.
-
 ## 1.1.0 — 2026-09-09
 
 - Keep the final replacement-import button disabled until the user selects the explicit overwrite confirmation.

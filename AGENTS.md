@@ -12,14 +12,12 @@ Preserve these invariants:
 - Verify every package before changing the destination; create a backup first and roll back on installation failure.
 - Keep English and Simplified Chinese translation keys identical.
 - Use only Python's standard library in runtime code unless the project requirements are intentionally changed.
-- Sidebar repair must never delete by title or use undocumented cloud APIs. Preserve `Network`, cookies, credentials, `.codex` conversations, databases, and global sidebar sections.
-- Require Codex/ChatGPT Desktop to be closed and create a verified backup before removing any allowlisted rebuildable desktop cache directory.
 
 After a functional change, run:
 
 ```powershell
 python -m unittest discover -s tests -v
-python -m py_compile codex_transfer.py codex_transfer_core.py codex_sidebar_repair.py codex_sidebar_repair_core.py
+python -m py_compile codex_transfer.py codex_transfer_core.py
 python codex_transfer.py --version
 git diff --check
 ```
