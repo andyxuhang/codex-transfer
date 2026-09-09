@@ -1,41 +1,43 @@
-# Codex Transfer 1.1.0
+# Codex Transfer 1.2.0
 
-This update improves replacement safety and portable USB-drive use.
+This release adds a separate, safety-focused utility for repairing stale Codex Desktop sidebar entries.
 
-## Changes
+## New: Codex Sidebar Repair
 
-- The final replacement-import button is disabled until the user selects the explicit overwrite confirmation checkbox.
-- The documentation now recommends copying the executable to the root of a USB drive and running it there. The migration package is then created in the USB-drive root by default.
-- New Windows executable builds include a GitHub build-provenance attestation in addition to the SHA-256 checksum.
+- Use `Codex-Sidebar-Repair.exe` when an already-deleted chat remains visible, cannot be opened, and fails when deleted again.
+- Read-only scan distinguishes missing local thread files from unreferenced JSONL files; unreferenced files are never deleted.
+- The repair creates a verified ZIP backup before rebuilding the desktop web/sidebar cache.
+- Login cookies, local conversations, automations, workspaces, memories, credentials, and machine configuration are not deleted.
+- Codex/ChatGPT Desktop must be fully closed and the confirmation box selected.
+
+The tool does not delete by title. Cloud conversations that still exist on the account will return after synchronization; cloud-side deletion failures require the ChatGPT account interface or OpenAI support.
 
 ## Downloads
 
-- `Codex-Transfer.exe`: standalone Windows application; Python is not required.
-- `Codex-Transfer.exe.sha256.txt`: SHA-256 checksum for the executable.
-- Source archives are generated automatically by GitHub.
-
-> The community executable is not currently Authenticode-signed with a commercial identity certificate, so Windows may still display a SmartScreen warning.
-
-> Migration packages are unencrypted archives. Store and transfer them securely because they can contain private local Codex data.
+- `Codex-Transfer.exe`: replacement-only migration utility.
+- `Codex-Sidebar-Repair.exe`: stale sidebar cache repair utility.
+- Matching `.sha256.txt` files: SHA-256 checksums.
+- Both executables receive GitHub build-provenance attestations.
 
 ---
 
-# Codex 迁移工具 1.1.0
+# Codex 迁移工具 1.2.0
 
-此版本增强了覆盖操作的安全性，并优化了 U 盘便携使用流程。
+此版本新增一个独立、安全优先的工具，用于修复 Codex Desktop 侧栏中的无效残留条目。
 
-## 更新内容
+## 新增：Codex 侧栏修复
 
-- 只有勾选明确的覆盖确认框后，最终覆盖导入按钮才会启用；此前按钮保持灰色且不可点击。
-- 说明文档现在建议把 EXE 复制到 U 盘根目录并从那里运行，迁移包默认也会直接生成在 U 盘根目录。
-- 新构建的 Windows EXE 除 SHA-256 校验文件外，还会生成 GitHub 构建来源证明。
+- 当聊天已经删除，但条目仍显示、无法打开且再次删除失败时，可使用 `Codex-Sidebar-Repair.exe`。
+- 只读扫描会区分本地数据库记录缺少聊天文件和当前未引用的 JSONL 文件；未引用文件绝不删除。
+- 重建桌面端网页/侧栏缓存前，程序会先创建并校验 ZIP 备份。
+- 不删除登录 Cookie、本地聊天、自动任务、工作目录、记忆、凭据或机器配置。
+- 必须完全退出 Codex/ChatGPT Desktop，并勾选确认框后才能执行。
 
-## 下载说明
+工具不会按标题删除聊天。如果聊天在账号云端仍存在，同步后仍会回来；云端删除失败需要在 ChatGPT 账号界面处理或联系 OpenAI 支持。
 
-- `Codex-Transfer.exe`：Windows 独立程序，不需要安装 Python。
-- `Codex-Transfer.exe.sha256.txt`：EXE 的 SHA-256 校验文件。
-- 源码压缩包由 GitHub 自动生成。
+## 下载
 
-> 社区版 EXE 目前尚未使用商业身份验证证书进行 Authenticode 签名，因此 Windows 仍可能显示 SmartScreen 警告。
-
-> 迁移包是未加密的压缩文件，其中可能包含私密的本地 Codex 数据，请安全保存和传输。
+- `Codex-Transfer.exe`：只支持覆盖的迁移工具。
+- `Codex-Sidebar-Repair.exe`：侧栏残留缓存修复工具。
+- 对应的 `.sha256.txt`：SHA-256 校验文件。
+- 两个 EXE 都会生成 GitHub 构建来源证明。

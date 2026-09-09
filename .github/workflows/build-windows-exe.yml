@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Release tag to build and upload
         required: true
-        default: v1.1.0
+        default: v1.2.0
 
 permissions:
   contents: write
@@ -29,26 +29,33 @@ jobs:
         run: python -m pip install --disable-pip-version-check pyinstaller==6.22.2
 
       - name: Build portable GUI executable
-        run: >-
-          python -m PyInstaller --clean --noconfirm --onefile --windowed
-          --name Codex-Transfer codex_transfer.py
+        shell: pwsh
+        run: |
+          python -m PyInstaller --clean --noconfirm --onefile --windowed --name Codex-Transfer codex_transfer.py
+          python -m PyInstaller --clean --noconfirm --onefile --windowed --name Codex-Sidebar-Repair codex_sidebar_repair.py
 
       - name: Smoke-test executable
         shell: pwsh
         run: |
           $process = Start-Process -FilePath "dist\Codex-Transfer.exe" -ArgumentList "--version" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Executable smoke test failed with exit code $($process.ExitCode)" }
+          $repairProcess = Start-Process -FilePath "dist\Codex-Sidebar-Repair.exe" -ArgumentList "--version" -Wait -PassThru
+          if ($repairProcess.ExitCode -ne 0) { throw "Sidebar Repair smoke test failed with exit code $($repairProcess.ExitCode)" }
 
       - name: Create SHA-256 file
         shell: pwsh
         run: |
           $hash = (Get-FileHash -Algorithm SHA256 "dist\Codex-Transfer.exe").Hash.ToLowerInvariant()
           "$hash  Codex-Transfer.exe" | Set-Content -Encoding ascii "dist\Codex-Transfer.exe.sha256.txt"
+          $repairHash = (Get-FileHash -Algorithm SHA256 "dist\Codex-Sidebar-Repair.exe").Hash.ToLowerInvariant()
+          "$repairHash  Codex-Sidebar-Repair.exe" | Set-Content -Encoding ascii "dist\Codex-Sidebar-Repair.exe.sha256.txt"
 
       - name: Attest executable build provenance
         uses: actions/attest-build-provenance@v3
         with:
-          subject-path: dist/Codex-Transfer.exe
+          subject-path: |
+            dist/Codex-Transfer.exe
+            dist/Codex-Sidebar-Repair.exe
 
       - uses: actions/upload-artifact@v4
         with:
@@ -56,6 +63,8 @@ jobs:
           path: |
             dist/Codex-Transfer.exe
             dist/Codex-Transfer.exe.sha256.txt
+            dist/Codex-Sidebar-Repair.exe
+            dist/Codex-Sidebar-Repair.exe.sha256.txt
           if-no-files-found: error
 
       - name: Upload to GitHub Release
@@ -66,4 +75,6 @@ jobs:
           gh release upload "${{ inputs.release_tag }}"
           "dist\Codex-Transfer.exe"
           "dist\Codex-Transfer.exe.sha256.txt"
+          "dist\Codex-Sidebar-Repair.exe"
+          "dist\Codex-Sidebar-Repair.exe.sha256.txt"
           --clobber

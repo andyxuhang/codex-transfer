@@ -8,6 +8,10 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 
 用于在 Windows 电脑之间安全迁移本地 Codex / ChatGPT Desktop 聊天及其界面元数据的图形工具，仅支持覆盖，不支持合并。
 
+The release also includes **Codex Sidebar Repair**, a separate safety-focused utility for stale entries that remain visible after deletion but can no longer be opened.
+
+Release 中还包含独立的 **Codex 侧栏修复**小工具，用于处理已经删除却仍显示、再次删除失败且无法打开的残留条目。
+
 > **Unofficial community tool / 非官方社区工具**
 > Codex Transfer is not affiliated with or supported by OpenAI. Local Codex formats may change between app versions. Keep the generated backup and migration package until the destination has been verified.
 
@@ -123,6 +127,18 @@ Keep both the migration package and backup until the new PC has been verified.
 - External repositories and `.chatgpt-projects` workspaces are not bundled.
 - Importing into a different application version can trigger the application's own database migrations.
 
+### Codex Sidebar Repair
+
+Use `Codex-Sidebar-Repair.exe` only when a conversation was already deleted but its unusable entry remains in the desktop sidebar.
+
+1. Fully close Codex/ChatGPT Desktop and wait for the status bar to turn green.
+2. Select **Read-only scan**. The report distinguishes local database records with missing rollout files from unreferenced files; unreferenced files are reported only and are never deleted. The scan does not read browser-stored chat titles or message text.
+3. Select the confirmation box, then choose **Back up and rebuild sidebar cache**.
+4. Reopen Codex. The desktop web/sidebar cache is recreated automatically.
+5. Keep the backup shown in the result until the sidebar and login state have been checked.
+
+The repair tool does not delete conversations by title and does not remove the browser cookie store. It touches only an allowlist of rebuildable cache/web-state directories. If a conversation still exists on the signed-in account, it will appear again after synchronization. Cloud-side deletion failures cannot be fixed by editing `.codex`; use the ChatGPT account interface or OpenAI support in that case.
+
 ---
 
 ## 中文说明
@@ -232,6 +248,18 @@ C:\Users\<用户名>\CodexTransferBackups\before-import-YYYYMMDD-HHMMSS.zip
 - 仅存在于云端的数据由登录账号管理，本工具不会复制。
 - 外部 Git 仓库和 `.chatgpt-projects` 工作目录不会被打包。
 - 跨应用版本导入时，应用自身可能执行数据库迁移。
+
+### Codex 侧栏修复
+
+只有在聊天已经删除，但无效条目仍留在桌面端侧栏、无法打开且再次删除失败时，才使用 `Codex-Sidebar-Repair.exe`。
+
+1. 完全退出 Codex/ChatGPT Desktop，等待状态条变为绿色。
+2. 点击“只读扫描”。报告会区分“数据库记录对应文件已丢失”和“当前数据库未引用的文件”；未引用文件只报告、绝不删除。扫描不会读取浏览器缓存中的聊天标题或正文。
+3. 勾选确认框，然后点击“备份并重建侧栏缓存”。
+4. 重新打开 Codex，桌面端会自动重建网页和侧栏缓存。
+5. 检查侧栏和登录状态正常之前，请保留结果中显示的备份文件。
+
+修复工具不会按标题删除聊天，也不会删除浏览器 Cookie；它只处理白名单内可自动重建的缓存和网页状态目录。如果聊天在登录账号的云端仍然存在，同步后还会再次显示。云端删除失败不能靠修改 `.codex` 解决，需要在 ChatGPT 账号界面处理或联系 OpenAI 支持。
 
 ## Development
 

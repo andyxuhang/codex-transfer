@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0 — 2026-09-09
+
+- Add a separate bilingual Codex Sidebar Repair GUI and CLI for stale, already-deleted sidebar entries.
+- Detect the Windows Codex Desktop web profile without reading cached chat titles or message text.
+- Scan local thread metadata read-only and distinguish missing rollout records from unreferenced JSONL files, which are never deleted.
+- Back up and transactionally remove only allowlisted rebuildable web/cache directories while preserving the browser cookie store.
+- Require explicit confirmation and a fully closed Codex/ChatGPT Desktop process before repair.
+- Build and attest `Codex-Sidebar-Repair.exe` alongside the migration executable.
+
 ## 1.1.0 — 2026-09-09
 
 - Keep the final replacement-import button disabled until the user selects the explicit overwrite confirmation.

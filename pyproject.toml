@@ -1,6 +1,6 @@
 [project]
 name = "codex-transfer"
-version = "1.1.0"
+version = "1.2.0"
 description = "Replacement-only Windows migration utility for local Codex Desktop data"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -17,10 +17,11 @@ classifiers = [
 
 [project.scripts]
 codex-transfer = "codex_transfer:main"
+codex-sidebar-repair = "codex_sidebar_repair:main"
 
 [project.urls]
 Homepage = "https://github.com/andyxuhang/codex-transfer"
 Issues = "https://github.com/andyxuhang/codex-transfer/issues"
 
 [tool.setuptools]
-py-modules = ["codex_transfer", "codex_transfer_core"]
+py-modules = ["codex_transfer", "codex_transfer_core", "codex_sidebar_repair", "codex_sidebar_repair_core"]

@@ -30,6 +30,8 @@ Merge import is not implemented. A package containing one selected chat would st
 ├─ AGENTS.md                         Mandatory guidance for coding agents
 ├─ codex_transfer.py                 Tkinter GUI, translations, CLI, worker queue
 ├─ codex_transfer_core.py            Migration, validation, mapping, and safety logic
+├─ codex_sidebar_repair.py           Separate bilingual stale-sidebar repair GUI and CLI
+├─ codex_sidebar_repair_core.py      Read-only diagnosis and transactional cache backup/rebuild
 ├─ tests/test_core.py                Synthetic end-to-end and regression tests
 ├─ README.md                         Public bilingual user guide
 ├─ SECURITY.md                       Data-handling and vulnerability policy
@@ -197,7 +199,7 @@ Run before every push:
 
 ```powershell
 python -m unittest discover -s tests -v
-python -m py_compile codex_transfer.py codex_transfer_core.py
+python -m py_compile codex_transfer.py codex_transfer_core.py codex_sidebar_repair.py codex_sidebar_repair_core.py
 python codex_transfer.py --version
 git diff --check
 ```
@@ -216,7 +218,13 @@ Regression coverage includes end-to-end replacement, backup and validation, cred
 
 The EXE is not currently Authenticode-signed. GitHub provenance proves how it was built but does not display a Windows “Verified publisher” identity.
 
-### 13. Safe extension points
+### 13. Sidebar repair utility
+
+`Codex-Sidebar-Repair.exe` is deliberately separate from replacement migration. It is intended for entries already deleted on the service but still rendered from stale desktop web state. It never deletes by title and does not inspect browser-stored chat text.
+
+The repair allowlist is `CACHE_DIRECTORIES` in `codex_sidebar_repair_core.py`. Keep authentication-bearing `Network`, cookies, credentials, local sessions, databases, and `.codex-global-state.json` out of that list. The operation requires Codex to be closed, atomically moves each target aside, creates and verifies a ZIP backup, and only then removes the staged cache. A cloud conversation that still exists will reappear after synchronization; do not add undocumented cloud API calls or extract account tokens to work around that boundary.
+
+### 14. Safe extension points
 
 - **Selective chat export:** feasible, but replacement import would leave only selected chats. Preserving destination chats needs a separately designed merge system.
 - **Local memories:** excluded. Support requires coordinated handling of `memories/`, `memories_1.sqlite`, and possible SQLite sidecars while preserving destination configuration.
@@ -251,6 +259,8 @@ Codex Transfer 是一个 Windows 优先的非官方迁移工具，用于迁移�
 - `codex_transfer_core.py`：白名单、打包、校验、SQLite 快照、路径映射、备份、覆盖、回滚和验证。
 - `codex_transfer.py`：Tkinter 界面、中英文翻译、后台线程事件队列和 CLI。
 - `tests/test_core.py`：完全使用合成数据的端到端测试和回归测试。
+- `codex_sidebar_repair.py`：独立的中英文侧栏残留修复界面和命令行。
+- `codex_sidebar_repair_core.py`：只读诊断、事务式缓存备份和重建。
 - `AGENTS.md`：GPT 或其他编码代理开始工作时必须先读取的简短约束。
 - `.github/workflows/`：Windows 测试、EXE 构建、校验值和来源证明。
 
@@ -347,7 +357,7 @@ C:\Users\<用户名>\CodexTransferBackups\before-import-YYYYMMDD-HHMMSS.zip
 
 ```powershell
 python -m unittest discover -s tests -v
-python -m py_compile codex_transfer.py codex_transfer_core.py
+python -m py_compile codex_transfer.py codex_transfer_core.py codex_sidebar_repair.py codex_sidebar_repair_core.py
 python codex_transfer.py --version
 git diff --check
 ```
@@ -370,3 +380,9 @@ git diff --check
 - 遇到新版 Codex schema，应使用能力检测和合成测试，避免只适配单一固定版本。
 
 增加任何数据范围前，先回答五个问题：数据归谁所有、是否敏感、能否跨机器使用、覆盖语义是什么、失败后如何恢复。
+
+### 9. 侧栏修复工具
+
+`Codex-Sidebar-Repair.exe` 与覆盖迁移保持独立。它只用于“云端已经删除、桌面端仍从旧网页状态显示”的残留条目，不按标题删除，也不读取浏览器缓存中的聊天正文。
+
+修复白名单位于 `codex_sidebar_repair_core.py` 的 `CACHE_DIRECTORIES`。不得把含认证信息的 `Network`、Cookie、凭据、本地会话、数据库或 `.codex-global-state.json` 加入白名单。操作要求 Codex 已关闭；程序先把目标目录原子移动到临时名称，创建并校验 ZIP 备份，然后才清除暂存缓存。云端仍存在的聊天会在同步后重新出现；不要通过未公开云端接口或提取账号令牌绕过这一边界。
