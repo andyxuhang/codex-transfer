@@ -11,6 +11,10 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 > **Unofficial community tool / 非官方社区工具**
 > Codex Transfer is not affiliated with or supported by OpenAI. Local Codex formats may change between app versions. Keep the generated backup and migration package until the destination has been verified.
 
+Maintainers and coding agents: read the bilingual [Maintainer Guide](docs/MAINTAINER_GUIDE.md) and root [AGENTS.md](AGENTS.md) before making changes.
+
+维护者和编码助手：修改项目前，请先阅读中英文[维护指南](docs/MAINTAINER_GUIDE.md)和根目录 [AGENTS.md](AGENTS.md)。
+
 ## English
 
 ### What it transfers

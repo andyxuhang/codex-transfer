@@ -2,9 +2,9 @@
 
 ## Sensitive data / 敏感数据
 
-Codex Transfer packages contain private conversations, filenames, local paths, automation prompts, memory data, and possibly proprietary work artifacts. Treat every package and backup as confidential.
+Codex Transfer packages contain private conversations, filenames, local paths, automation prompts, sidebar/project metadata, and possibly proprietary work references. Treat every package and backup as confidential.
 
-Codex Transfer 迁移包包含私人对话、文件名、本地路径、自动任务提示、记忆数据以及可能属于公司的工作内容。请始终把迁移包和备份视为机密文件。
+Codex Transfer 迁移包包含私人对话、文件名、本地路径、自动任务提示、侧边栏/项目元数据以及可能属于公司的工作引用。请始终把迁移包和备份视为机密文件。
 
 Never upload a migration package, backup ZIP, real `.codex` database, `auth.json`, `.env`, or API key to a GitHub issue.
 
