@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6 — 2026-09-09
+
+- Stop guessing the Windows Desktop path, which may be localized or redirected.
+- Save new packages beside the migration tool by default, with a timestamped filename.
+- Start the Save dialog in the displayed package directory and add an Open package folder button.
+
 ## 1.0.5 — 2026-09-09
 
 - Check for Codex/ChatGPT processes at startup and every second using the native Windows process API.

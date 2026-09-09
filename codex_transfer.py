@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
+import os
 import queue
 import sys
 import threading
@@ -27,6 +29,7 @@ TEXT = {
         "browse": "浏览…",
         "scan": "扫描",
         "create": "创建迁移包",
+        "open_package_folder": "打开迁移包文件夹",
         "verify": "校验迁移包",
         "import": "⬇ 新电脑：覆盖导入",
         "import_banner": "第 2 步 · 在新电脑备份并覆盖导入",
@@ -56,6 +59,7 @@ TEXT = {
         "map_missing": "请同时填写旧路径和新路径。",
         "package_ok": "迁移包校验通过",
         "version": "版本",
+        "folder_missing": "迁移包所在文件夹尚不存在。",
         "codex_running": "● Codex/ChatGPT 正在运行：{names}。请完全关闭后再迁移",
         "codex_closed": "● Codex 已关闭，可以安全迁移",
     },
@@ -69,6 +73,7 @@ TEXT = {
         "browse": "Browse…",
         "scan": "Scan",
         "create": "Create package",
+        "open_package_folder": "Open package folder",
         "verify": "Verify package",
         "import": "⬇ New PC: Replace import",
         "import_banner": "STEP 2 · Back up and replace on the new PC",
@@ -98,6 +103,7 @@ TEXT = {
         "map_missing": "Enter both old and new path prefixes.",
         "package_ok": "Package verification passed",
         "version": "Version",
+        "folder_missing": "The migration package folder does not exist yet.",
         "codex_running": "● Codex/ChatGPT is running: {names}. Fully close it before migration",
         "codex_closed": "● Codex is closed; migration is safe to start",
     },
@@ -117,7 +123,8 @@ class CodexTransferApp:
         self.root.minsize(780, 660)
         self.language = tk.StringVar(value="zh")
         self.source = tk.StringVar(value=str(core.default_codex_dir()))
-        default_package = Path.home() / "Desktop" / "Codex-Transfer.codextransfer.zip"
+        stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        default_package = application_directory() / f"Codex-Transfer-{stamp}.codextransfer.zip"
         self.export_package = tk.StringVar(value=str(default_package))
         self.import_package = tk.StringVar(value="")
         self.destination = tk.StringVar(value=str(core.default_codex_dir()))
@@ -190,6 +197,7 @@ class CodexTransferApp:
         actions.grid(row=3, column=1, columnspan=2, sticky="e", pady=(8, 0))
         self._button(actions, "scan", self._scan).pack(side="left", padx=4)
         self._button(actions, "create", self._export).pack(side="left", padx=4)
+        self._button(actions, "open_package_folder", self._open_export_folder).pack(side="left", padx=4)
 
         import_box = ttk.Frame(self.notebook, padding=12)
         import_box.columnconfigure(1, weight=1)
@@ -272,6 +280,7 @@ class CodexTransferApp:
         from tkinter import filedialog
         value = filedialog.asksaveasfilename(
             title=self.t("choose_package_save"), initialfile="Codex-Transfer.codextransfer.zip",
+            initialdir=str(Path(self.export_package.get()).parent),
             defaultextension=".zip", filetypes=(("Codex Transfer", "*.zip"),),
         )
         if value:
@@ -290,6 +299,20 @@ class CodexTransferApp:
         if value:
             self.destination.set(core.normalize_path_text(value))
             self._refresh_auto_map()
+
+    def _open_export_folder(self) -> None:
+        from tkinter import messagebox
+        folder = Path(self._normalize_variable(self.export_package)).parent.resolve()
+        if not folder.is_dir():
+            messagebox.showwarning(self.t("warning"), self.t("folder_missing"))
+            return
+        try:
+            if os.name == "nt":
+                os.startfile(str(folder))
+            else:
+                raise OSError("This shortcut is available on Windows only.")
+        except OSError as exc:
+            messagebox.showerror(self.t("error"), str(exc))
 
     def _refresh_auto_map(self) -> None:
         package_text = self.import_package.get().strip()
@@ -452,6 +475,12 @@ class CodexTransferApp:
 
     def run(self) -> None:
         self.root.mainloop()
+
+
+def application_directory() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
 
 
 def build_parser() -> argparse.ArgumentParser:

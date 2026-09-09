@@ -61,7 +61,7 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 1. 下载仓库或 Release ZIP。
 2. 双击 `run_codex_transfer.cmd`。
 3. 顶部状态条每秒检查一次 Codex/ChatGPT：红色表示仍在运行，绿色表示已经完全关闭。
-4. 在蓝色“旧电脑：导出”页面选择 `.codex` 数据目录和迁移包位置，点击“扫描”，然后“创建迁移包”。
+4. 在蓝色“旧电脑：导出”页面选择 `.codex` 数据目录和迁移包位置，点击“扫描”，然后“创建迁移包”。默认保存在工具所在文件夹，文件名带时间，不再猜测本地化或重定向的桌面路径。
 5. 把整个迁移包复制到新电脑。
 6. 在新电脑打开本工具，切换到橙色“新电脑：覆盖导入”页面，选择迁移包和目标 `.codex`，点击“校验迁移包”。
 7. 界面会显示自动路径映射。大多数用户无需填写手动映射；只有外部项目盘符或根目录变化时才添加。
@@ -71,6 +71,8 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 底部的“进度与结果”框在两个页面中始终可见。Windows 路径中的 `/` 和 `\` 均可输入，工具会在界面和路径映射中统一转换为 `\`。
 
 工具不会扫描或打包 `.chatgpt-projects`，因此导出规模和之前的聊天迁移包接近。
+
+导出完成后可点击“打开迁移包文件夹”。界面显示的完整路径就是实际保存位置。
 
 ### 命令行（可选）
 
@@ -155,7 +157,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 1. Download the repository or release ZIP.
 2. Double-click `run_codex_transfer.cmd`.
 3. The top status bar checks every second: red means Codex/ChatGPT is running; green means it is fully closed.
-4. On the blue **Old PC: Export** tab, select the `.codex` directory and a package path. Scan, then create the package.
+4. On the blue **Old PC: Export** tab, select the `.codex` directory and a package path. Scan, then create the package. The default is a timestamped file beside the tool, avoiding localized or redirected Desktop folders.
 5. Copy the package to the new PC.
 6. On the new PC, open the orange **New PC: Replace import** tab, select and verify the package, then select the destination `.codex` directory.
 7. Review the automatic maps shown in the UI. Most users need no manual map; add one only when an external project drive or root changed.
@@ -165,6 +167,8 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 The progress/output panel remains visible below both tabs. Either `/` or `\` is accepted in Windows path fields; the GUI and path mapper normalize them to `\`.
 
 The tool does not scan or package `.chatgpt-projects`, so export size remains close to the earlier conversation-only migration package.
+
+After export, use **Open package folder**. The full path shown in the GUI is the actual save location.
 
 ### Important limitations
 
