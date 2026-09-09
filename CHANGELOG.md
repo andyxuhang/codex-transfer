@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.5 — 2026-09-09
+
+- Check for Codex/ChatGPT processes at startup and every second using the native Windows process API.
+- Show a prominent red running warning or green closed status in the GUI.
+- Distinguish Export and Import with directional tab icons plus blue/orange step banners.
+- Preview the exact automatic `.codex` and user-home mappings on the Import page; keep custom maps optional for changed external project roots.
+
 ## 1.0.4 — 2026-09-09
 
 - Return to the proven conversation-only migration scope: sessions, archived sessions, attachments, session index, and `state_5.sqlite`.

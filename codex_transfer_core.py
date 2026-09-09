@@ -22,7 +22,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Optional
 
 
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 FORMAT_NAME = "codex-transfer-package"
 FORMAT_VERSION = 1
 MANIFEST_NAME = "codex-transfer-manifest.json"
@@ -437,6 +437,18 @@ def parse_path_maps(values: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
     return sorted(unique.values(), key=lambda item: len(item[0]), reverse=True)
 
 
+def automatic_path_maps(manifest: dict[str, Any], destination: Path) -> list[tuple[str, str]]:
+    destination = destination.resolve()
+    pairs = [
+        (str(manifest.get("source_codex_dir", "")), str(destination)),
+        (str(manifest.get("source_user_home", "")), str(destination.parent)),
+    ]
+    return parse_path_maps(
+        pair for pair in pairs
+        if pair[0] and normalize_path_text(pair[0]).casefold() != normalize_path_text(pair[1]).casefold()
+    )
+
+
 def replace_path_prefix(value: str, maps: list[tuple[str, str]]) -> str:
     normalized = value.replace("/", "\\")
     extended = normalized.startswith("\\\\?\\")
@@ -750,13 +762,64 @@ def inspect_codex_data(root: Path, check_rollouts: bool = True) -> dict[str, Any
 def codex_processes() -> list[str]:
     if os.name != "nt":
         return []
+    expected = {"codex.exe", "chatgpt.exe"}
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class ProcessEntry32W(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", wintypes.WPARAM),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", wintypes.LONG),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", wintypes.WCHAR * 260),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_snapshot = kernel32.CreateToolhelp32Snapshot
+        create_snapshot.argtypes = (wintypes.DWORD, wintypes.DWORD)
+        create_snapshot.restype = wintypes.HANDLE
+        process_first = kernel32.Process32FirstW
+        process_first.argtypes = (wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W))
+        process_first.restype = wintypes.BOOL
+        process_next = kernel32.Process32NextW
+        process_next.argtypes = (wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W))
+        process_next.restype = wintypes.BOOL
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = (wintypes.HANDLE,)
+        close_handle.restype = wintypes.BOOL
+
+        snapshot = create_snapshot(0x00000002, 0)
+        if snapshot == wintypes.HANDLE(-1).value:
+            raise OSError(ctypes.get_last_error(), "CreateToolhelp32Snapshot failed")
+        found = set()
+        try:
+            entry = ProcessEntry32W()
+            entry.dwSize = ctypes.sizeof(entry)
+            success = process_first(snapshot, ctypes.byref(entry))
+            while success:
+                name = entry.szExeFile.casefold()
+                if name in expected:
+                    found.add(name)
+                success = process_next(snapshot, ctypes.byref(entry))
+        finally:
+            close_handle(snapshot)
+        return sorted(found)
+    except (AttributeError, OSError, ValueError):
+        pass
     try:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         output = subprocess.check_output(["tasklist", "/FO", "CSV", "/NH"], text=True, errors="replace", creationflags=flags)
         found = []
         for line in output.splitlines():
             name = line.split('","', 1)[0].strip('"').lower()
-            if name in {"codex.exe", "chatgpt.exe"}:
+            if name in expected:
                 found.append(name)
         return sorted(set(found))
     except (OSError, subprocess.SubprocessError):
@@ -782,11 +845,7 @@ def import_package(
     if not verification["ok"]:
         raise TransferError("Package hash verification failed. Destination was not changed.")
     manifest = verification["manifest"]
-    automatic = [
-        (str(manifest.get("source_codex_dir", "")), str(destination)),
-        (str(manifest.get("source_user_home", "")), str(destination.parent)),
-    ]
-    maps = parse_path_maps([pair for pair in automatic if pair[0] and pair[0].lower() != pair[1].lower()] + list(custom_maps))
+    maps = parse_path_maps(automatic_path_maps(manifest, destination) + list(custom_maps))
     destination.parent.mkdir(parents=True, exist_ok=True)
     target_profile = discover_profile_key(destination / ".codex-global-state.json")
     backup = destination.parent / "CodexTransferBackups" / f"before-import-{time_stamp()}.zip"

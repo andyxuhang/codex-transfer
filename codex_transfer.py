@@ -20,17 +20,23 @@ TEXT = {
     "zh": {
         "title": "Codex 迁移工具",
         "subtitle": "将旧电脑上的聊天、Work 任务、分区和自动任务安全覆盖到新电脑",
-        "export": "旧电脑：导出",
+        "export": "⬆ 旧电脑：导出",
+        "export_banner": "第 1 步 · 在旧电脑创建迁移包",
         "source": "Codex 数据目录",
         "package": "迁移包",
         "browse": "浏览…",
         "scan": "扫描",
         "create": "创建迁移包",
         "verify": "校验迁移包",
-        "import": "新电脑：覆盖导入",
+        "import": "⬇ 新电脑：覆盖导入",
+        "import_banner": "第 2 步 · 在新电脑备份并覆盖导入",
         "destination": "目标 Codex 目录",
         "old_path": "旧路径前缀",
         "new_path": "新路径前缀",
+        "auto_map": "自动路径映射",
+        "auto_map_default": "选择迁移包后自动显示；大多数用户无需手动映射",
+        "auto_map_same": "源目录与目标目录相同，无需路径转换",
+        "manual_map_hint": "可选：仅当外部项目盘符或根目录发生变化时填写",
         "add_map": "添加路径映射",
         "remove_map": "删除选中映射",
         "confirm": "我确认目标中的聊天、Work、分区和自动任务可以被备份后覆盖（不合并）",
@@ -50,21 +56,29 @@ TEXT = {
         "map_missing": "请同时填写旧路径和新路径。",
         "package_ok": "迁移包校验通过",
         "version": "版本",
+        "codex_running": "● Codex/ChatGPT 正在运行：{names}。请完全关闭后再迁移",
+        "codex_closed": "● Codex 已关闭，可以安全迁移",
     },
     "en": {
         "title": "Codex Transfer",
         "subtitle": "Safely replace chats, Work tasks, sidebar sections, and automations on a new PC",
-        "export": "Old PC: Export",
+        "export": "⬆ Old PC: Export",
+        "export_banner": "STEP 1 · Create the package on the old PC",
         "source": "Codex data directory",
         "package": "Migration package",
         "browse": "Browse…",
         "scan": "Scan",
         "create": "Create package",
         "verify": "Verify package",
-        "import": "New PC: Replace import",
+        "import": "⬇ New PC: Replace import",
+        "import_banner": "STEP 2 · Back up and replace on the new PC",
         "destination": "Destination Codex directory",
         "old_path": "Old path prefix",
         "new_path": "New path prefix",
+        "auto_map": "Automatic path maps",
+        "auto_map_default": "Select a package to preview; most users need no manual map",
+        "auto_map_same": "Source and destination paths match; no path conversion is needed",
+        "manual_map_hint": "Optional: use only when an external project drive or root changed",
         "add_map": "Add path map",
         "remove_map": "Remove selected map",
         "confirm": "I confirm destination chats, Work data, sections, and automations may be backed up and replaced (no merge)",
@@ -84,6 +98,8 @@ TEXT = {
         "map_missing": "Enter both old and new path prefixes.",
         "package_ok": "Package verification passed",
         "version": "Version",
+        "codex_running": "● Codex/ChatGPT is running: {names}. Fully close it before migration",
+        "codex_closed": "● Codex is closed; migration is safe to start",
     },
 }
 
@@ -97,8 +113,8 @@ class CodexTransferApp:
         self.ttk = ttk
         self.root = tk.Tk()
         self.root.title("Codex Transfer")
-        self.root.geometry("900x690")
-        self.root.minsize(760, 600)
+        self.root.geometry("920x760")
+        self.root.minsize(780, 660)
         self.language = tk.StringVar(value="zh")
         self.source = tk.StringVar(value=str(core.default_codex_dir()))
         default_package = Path.home() / "Desktop" / "Codex-Transfer.codextransfer.zip"
@@ -107,15 +123,18 @@ class CodexTransferApp:
         self.destination = tk.StringVar(value=str(core.default_codex_dir()))
         self.old_path = tk.StringVar()
         self.new_path = tk.StringVar()
+        self.auto_map_text = tk.StringVar(value=TEXT["zh"]["auto_map_default"])
         self.confirmed = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value=TEXT["zh"]["ready"])
         self.progress_value = tk.DoubleVar(value=0)
         self.events: queue.Queue[tuple[str, Any]] = queue.Queue()
         self._last_progress_event_at = 0.0
+        self._last_codex_processes: list[str] = []
         self.widgets: dict[str, Any] = {}
         self.busy_buttons: list[Any] = []
         self._build()
         self._translate()
+        self._check_codex_status()
         self.root.after(100, self._drain_events)
 
     def t(self, key: str) -> str:
@@ -132,12 +151,13 @@ class CodexTransferApp:
         self.busy_buttons.append(widget)
         return widget
 
-    def _build_path_row(self, parent: Any, row: int, label_key: str, variable: Any, browse: Callable[[], None]) -> None:
+    def _build_path_row(self, parent: Any, row: int, label_key: str, variable: Any, browse: Callable[[], None]) -> Any:
         self._label(parent, label_key).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=6)
         entry = self.ttk.Entry(parent, textvariable=variable)
         entry.grid(row=row, column=1, sticky="ew", pady=6)
         entry.bind("<FocusOut>", lambda _event: self._normalize_variable(variable))
         self._button(parent, f"{label_key}_browse", browse, width=11).grid(row=row, column=2, padx=(8, 0), pady=6)
+        return entry
 
     def _build(self) -> None:
         tk, ttk = self.tk, self.ttk
@@ -151,7 +171,9 @@ class CodexTransferApp:
         language_box.pack(side="right")
         language_box.bind("<<ComboboxSelected>>", lambda _: self._translate())
         self.widgets["subtitle"] = ttk.Label(outer, foreground="#555555")
-        self.widgets["subtitle"].pack(anchor="w", pady=(3, 14))
+        self.widgets["subtitle"].pack(anchor="w", pady=(3, 8))
+        self.codex_status_label = tk.Label(outer, anchor="w", padx=10, pady=7, font=("Segoe UI", 10, "bold"))
+        self.codex_status_label.pack(fill="x", pady=(0, 12))
 
         self.notebook = ttk.Notebook(outer)
         self.notebook.pack(fill="x", pady=(0, 12))
@@ -160,10 +182,12 @@ class CodexTransferApp:
         export_box.columnconfigure(1, weight=1)
         self.notebook.add(export_box)
         self.export_page = export_box
-        self._build_path_row(export_box, 0, "source", self.source, self._browse_source)
-        self._build_path_row(export_box, 1, "package", self.export_package, self._browse_export_package)
+        self.widgets["export_banner"] = tk.Label(export_box, bg="#1769AA", fg="white", anchor="w", padx=12, pady=9, font=("Segoe UI", 12, "bold"))
+        self.widgets["export_banner"].grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
+        self._build_path_row(export_box, 1, "source", self.source, self._browse_source)
+        self._build_path_row(export_box, 2, "package", self.export_package, self._browse_export_package)
         actions = ttk.Frame(export_box)
-        actions.grid(row=2, column=1, columnspan=2, sticky="e", pady=(8, 0))
+        actions.grid(row=3, column=1, columnspan=2, sticky="e", pady=(8, 0))
         self._button(actions, "scan", self._scan).pack(side="left", padx=4)
         self._button(actions, "create", self._export).pack(side="left", padx=4)
 
@@ -171,24 +195,32 @@ class CodexTransferApp:
         import_box.columnconfigure(1, weight=1)
         self.notebook.add(import_box)
         self.import_page = import_box
-        self._build_path_row(import_box, 0, "package_import", self.import_package, self._browse_import_package)
-        self._build_path_row(import_box, 1, "destination", self.destination, self._browse_destination)
-        self._label(import_box, "old_path").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=6)
+        self.widgets["import_banner"] = tk.Label(import_box, bg="#B54708", fg="white", anchor="w", padx=12, pady=9, font=("Segoe UI", 12, "bold"))
+        self.widgets["import_banner"].grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
+        package_entry = self._build_path_row(import_box, 1, "package_import", self.import_package, self._browse_import_package)
+        destination_entry = self._build_path_row(import_box, 2, "destination", self.destination, self._browse_destination)
+        package_entry.bind("<FocusOut>", lambda _event: self._refresh_auto_map(), add="+")
+        destination_entry.bind("<FocusOut>", lambda _event: self._refresh_auto_map(), add="+")
+        self._label(import_box, "auto_map").grid(row=3, column=0, sticky="nw", padx=(0, 10), pady=6)
+        ttk.Label(import_box, textvariable=self.auto_map_text, foreground="#1769AA", wraplength=650, justify="left").grid(row=3, column=1, columnspan=2, sticky="w", pady=6)
+        self.widgets["manual_map_hint"] = ttk.Label(import_box, foreground="#7A4E00")
+        self.widgets["manual_map_hint"].grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 2))
+        self._label(import_box, "old_path").grid(row=5, column=0, sticky="w", padx=(0, 10), pady=6)
         old_entry = ttk.Entry(import_box, textvariable=self.old_path)
-        old_entry.grid(row=2, column=1, sticky="ew", pady=6)
+        old_entry.grid(row=5, column=1, sticky="ew", pady=6)
         old_entry.bind("<FocusOut>", lambda _event: self._normalize_variable(self.old_path))
-        self._label(import_box, "new_path").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=6)
+        self._label(import_box, "new_path").grid(row=6, column=0, sticky="w", padx=(0, 10), pady=6)
         new_entry = ttk.Entry(import_box, textvariable=self.new_path)
-        new_entry.grid(row=3, column=1, sticky="ew", pady=6)
+        new_entry.grid(row=6, column=1, sticky="ew", pady=6)
         new_entry.bind("<FocusOut>", lambda _event: self._normalize_variable(self.new_path))
-        self._button(import_box, "add_map", self._add_map).grid(row=2, column=2, rowspan=2, padx=(8, 0))
+        self._button(import_box, "add_map", self._add_map).grid(row=5, column=2, rowspan=2, padx=(8, 0))
         self.maps = tk.Listbox(import_box, height=3, selectmode="extended")
-        self.maps.grid(row=4, column=1, sticky="ew", pady=6)
-        self._button(import_box, "remove_map", self._remove_map).grid(row=4, column=2, padx=(8, 0))
+        self.maps.grid(row=7, column=1, sticky="ew", pady=6)
+        self._button(import_box, "remove_map", self._remove_map).grid(row=7, column=2, padx=(8, 0))
         self.widgets["confirm"] = ttk.Checkbutton(import_box, variable=self.confirmed)
-        self.widgets["confirm"].grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 4))
+        self.widgets["confirm"].grid(row=8, column=0, columnspan=3, sticky="w", pady=(8, 4))
         actions2 = ttk.Frame(import_box)
-        actions2.grid(row=6, column=1, columnspan=2, sticky="e", pady=(6, 0))
+        actions2.grid(row=9, column=1, columnspan=2, sticky="e", pady=(6, 0))
         self._button(actions2, "verify", self._verify).pack(side="left", padx=4)
         self._button(actions2, "apply", self._import).pack(side="left", padx=4)
 
@@ -215,6 +247,20 @@ class CodexTransferApp:
                 widget.configure(text=self.t(translated_key))
         self.status.set(self.t("ready"))
         self.root.title(f"{self.t('title')} — {core.APP_VERSION}")
+        self._render_codex_status()
+        self._refresh_auto_map()
+
+    def _render_codex_status(self) -> None:
+        if self._last_codex_processes:
+            text = self.t("codex_running").format(names=", ".join(self._last_codex_processes))
+            self.codex_status_label.configure(text=text, fg="#B42318", bg="#FEE4E2")
+        else:
+            self.codex_status_label.configure(text=self.t("codex_closed"), fg="#067647", bg="#ECFDF3")
+
+    def _check_codex_status(self) -> None:
+        self._last_codex_processes = core.codex_processes()
+        self._render_codex_status()
+        self.root.after(1000, self._check_codex_status)
 
     def _browse_source(self) -> None:
         from tkinter import filedialog
@@ -236,12 +282,31 @@ class CodexTransferApp:
         value = filedialog.askopenfilename(title=self.t("choose_package"), filetypes=(("Codex Transfer", "*.zip"), ("All files", "*.*")))
         if value:
             self.import_package.set(core.normalize_path_text(value))
+            self._refresh_auto_map()
 
     def _browse_destination(self) -> None:
         from tkinter import filedialog
         value = filedialog.askdirectory(title=self.t("choose_destination"), initialdir=self.destination.get())
         if value:
             self.destination.set(core.normalize_path_text(value))
+            self._refresh_auto_map()
+
+    def _refresh_auto_map(self) -> None:
+        package_text = self.import_package.get().strip()
+        if not package_text:
+            self.auto_map_text.set(self.t("auto_map_default"))
+            return
+        try:
+            package = Path(core.normalize_path_text(package_text))
+            destination = Path(core.normalize_path_text(self.destination.get())).resolve()
+            manifest = core.read_package_manifest(package)
+            maps = core.automatic_path_maps(manifest, destination)
+            if maps:
+                self.auto_map_text.set("\n".join(f"{old}  →  {new}" for old, new in maps))
+            else:
+                self.auto_map_text.set(self.t("auto_map_same"))
+        except (core.TransferError, OSError):
+            self.auto_map_text.set(self.t("auto_map_default"))
 
     def _normalize_variable(self, variable: Any) -> str:
         value = core.normalize_path_text(variable.get())
@@ -342,6 +407,7 @@ class CodexTransferApp:
     def _finish_export(self, result: dict[str, Any]) -> None:
         from tkinter import messagebox
         self.import_package.set(self.export_package.get())
+        self._refresh_auto_map()
         self._show_json(result)
         messagebox.showinfo(self.t("done"), str(Path(self.export_package.get()).resolve()))
 

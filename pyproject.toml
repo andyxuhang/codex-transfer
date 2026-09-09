@@ -1,6 +1,6 @@
 [project]
 name = "codex-transfer"
-version = "1.0.4"
+version = "1.0.5"
 description = "Replacement-only Windows migration utility for local Codex Desktop data"
 readme = "README.md"
 requires-python = ">=3.9"

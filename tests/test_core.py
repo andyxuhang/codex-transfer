@@ -213,6 +213,15 @@ class TransferTests(unittest.TestCase):
             core.replace_path_prefix(r"C:\Users\Andy Xu\Documents\Codex\Project", maps),
             r"D:\Users\Andy Xu\Documents\Codex\Project",
         )
+        automatic = core.automatic_path_maps(
+            {
+                "source_codex_dir": r"C:\Users\Old User\.codex",
+                "source_user_home": r"C:\Users\Old User",
+            },
+            Path(r"D:\Users\New User\.codex"),
+        )
+        self.assertEqual(automatic[0], (r"C:\Users\Old User\.codex", r"D:\Users\New User\.codex"))
+        self.assertEqual(automatic[1], (r"C:\Users\Old User", r"D:\Users\New User"))
 
 
 if __name__ == "__main__":
