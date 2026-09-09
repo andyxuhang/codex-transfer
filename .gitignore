@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.zip
+*.partial
+*.codextransfer.*
+*.import-result.json
+.pytest_cache/
+.coverage
+dist/
+build/
+*.spec
