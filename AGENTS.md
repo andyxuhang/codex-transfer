@@ -6,6 +6,7 @@ Preserve these invariants:
 
 - Migration is replacement-only. Do not add database merge behavior without a separate design and migration test suite.
 - Export is allowlist-based. Never replace it with a broad copy of `.codex`.
+- Never package `state_5.sqlite`, `state_5.sqlite-wal`, or `state_5.sqlite-shm`; they are machine-local. Import must back up and remove the destination copies so Codex can rebuild its index.
 - Credentials, device identity, machine configuration, plugins, caches, logs, managed workspaces, generated images, memories, rules, custom skills, vendor imports, and external repositories stay excluded unless the maintainer deliberately changes the product scope and security policy.
 - Never modify the source `.codex` directory or the migration ZIP. Rewrite paths only in temporary staging data.
 - Require Codex/ChatGPT Desktop to be closed for export and import.

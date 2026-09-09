@@ -18,6 +18,6 @@ Please use GitHub private vulnerability reporting when enabled. Otherwise contac
 
 ## Scope / 范围
 
-The project intentionally excludes account credentials, device identity, machine configuration, caches, logs, plugin runtimes, managed workspace contents (`.chatgpt-projects`), generated images, memories, rules, custom skills, vendor imports, and external repositories. A change that causes any excluded item to enter a package should be treated as a security vulnerability.
+The project intentionally excludes account credentials, device identity, machine configuration, `state_5.sqlite` and its `-wal`/`-shm` sidecars, caches, logs, plugin runtimes, managed workspace contents (`.chatgpt-projects`), generated images, memories, rules, custom skills, vendor imports, and external repositories. The state database is machine-local and may contain computer/device metadata. A change that causes any excluded item to enter a package should be treated as a security vulnerability.
 
-本项目明确排除账户凭据、设备身份、机器配置、缓存、日志、插件运行时、托管工作目录（`.chatgpt-projects`）、生成图片、记忆、规则、自定义技能、第三方导入目录和外部仓库。任何导致这些排除项进入迁移包的更改都应视为安全漏洞。
+本项目明确排除账户凭据、设备身份、机器配置、`state_5.sqlite` 及其 `-wal`/`-shm` 辅助文件、缓存、日志、插件运行时、托管工作目录（`.chatgpt-projects`）、生成图片、记忆、规则、自定义技能、第三方导入目录和外部仓库。该状态数据库属于本机数据，可能包含电脑或设备信息。任何导致这些排除项进入迁移包的更改都应视为安全漏洞。

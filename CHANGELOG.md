@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 — 2026-09-09
+
+- Exclude `state_5.sqlite`, `state_5.sqlite-wal`, and `state_5.sqlite-shm` from every new migration package so old-computer identity and device metadata cannot be copied to the new computer.
+- Back up and remove the destination's three machine-local index files during replacement import, then let Codex rebuild a fresh local index from imported JSONL sessions.
+- Reject older package format versions and any package that attempts to include a machine-local database.
+- Update bilingual UI guidance, security documentation, maintainer invariants, and synthetic regression tests for the new privacy boundary.
+
 ## 1.1.0 — 2026-09-09
 
 - Keep the final replacement-import button disabled until the user selects the explicit overwrite confirmation.

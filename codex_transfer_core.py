@@ -23,9 +23,9 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Optional
 
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.3.0"
 FORMAT_NAME = "codex-transfer-package"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 MANIFEST_NAME = "codex-transfer-manifest.json"
 
 # User-created data. Machine identity, credentials, caches, logs, plugins, and
@@ -40,10 +40,14 @@ PLAIN_FILES = (
     "session_index.jsonl",
 )
 GLOBAL_STATE_FILE = ".codex-global-state.json"
-DATABASE_FILES = (
-    "state_5.sqlite",
+# This index is machine-local and can contain device identity. It is inspected
+# read-only for source diagnostics, but is never put in a migration package.
+LOCAL_INDEX_DATABASE = "state_5.sqlite"
+LOCAL_INDEX_FILES = (
+    LOCAL_INDEX_DATABASE,
+    "state_5.sqlite-wal",
+    "state_5.sqlite-shm",
 )
-DATABASE_SIDE_SUFFIXES = ("-wal", "-shm")
 PATH_FIELD_NAMES = {
     "cwd", "path", "rollout_path", "session_path", "project_path",
     "workspace_path", "working_directory", "workdir", "output_dir",
@@ -70,6 +74,7 @@ EXCLUDED_LABELS = (
     ".env / API keys",
     "config.toml / machine-specific configuration",
     "installation_id / device identity",
+    "state_5.sqlite, state_5.sqlite-wal and state_5.sqlite-shm / machine-local index and device metadata",
     "plugins, cache, logs, sandbox and temporary runtime files",
     "managed workspace contents (.chatgpt-projects), project source and build output",
     "generated images, memories, rules, custom skills and vendor imports",
@@ -169,28 +174,6 @@ def copy2_resilient(source: Path, destination: Path, attempts: int = 3) -> None:
     ) from last_error
 
 
-def quote_identifier(value: str) -> str:
-    return '"' + value.replace('"', '""') + '"'
-
-
-def sqlite_snapshot(source: Path, target: Path) -> None:
-    source_db: Optional[sqlite3.Connection] = None
-    target_db: Optional[sqlite3.Connection] = None
-    try:
-        source_db = sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True, timeout=30)
-        source_db.execute("PRAGMA query_only=ON")
-        target_db = sqlite3.connect(str(target))
-        source_db.backup(target_db)
-        target_db.commit()
-    except sqlite3.Error as exc:
-        raise TransferError(f"SQLite snapshot failed for {source.name}: {exc}") from exc
-    finally:
-        if target_db is not None:
-            target_db.close()
-        if source_db is not None:
-            source_db.close()
-
-
 def source_inventory(source: Path) -> dict[str, Any]:
     source = source.resolve()
     inventory: dict[str, Any] = {
@@ -201,9 +184,13 @@ def source_inventory(source: Path) -> dict[str, Any]:
     }
     for name in DATA_DIRS:
         inventory["directories"][name] = count_files(source / name)
-    for name in PLAIN_FILES + (GLOBAL_STATE_FILE,) + DATABASE_FILES:
+    for name in PLAIN_FILES + (GLOBAL_STATE_FILE,):
         path = source / name
         inventory["files"][name] = path.stat().st_size if path.is_file() else None
+    inventory["local_index_files_read_only"] = {
+        name: (source / name).stat().st_size if (source / name).is_file() else None
+        for name in LOCAL_INDEX_FILES
+    }
     inventory.update(inspect_codex_data(source, check_rollouts=False))
     return inventory
 
@@ -230,7 +217,7 @@ def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> list
             candidates.append((src, stage / filename, src.stat().st_size))
 
     global_state = source / GLOBAL_STATE_FILE
-    total = max(len(candidates) + len(DATABASE_FILES) + int(global_state.is_file()), 1)
+    total = max(len(candidates) + int(global_state.is_file()), 1)
     total_bytes = sum(item[2] for item in candidates)
     done = 0
     copied_bytes = 0
@@ -257,15 +244,6 @@ def _copy_source_to_stage(source: Path, stage: Path, progress: Progress) -> list
         )
         done += 1
         progress("Copying sanitized sidebar and section state", done / total * 0.55)
-    for filename in DATABASE_FILES:
-        src = source / filename
-        if not src.is_file():
-            continue
-        dst = stage / filename
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        progress(f"Snapshotting {filename}", done / total * 0.55)
-        sqlite_snapshot(src, dst)
-        done += 1
     return warnings
 
 
@@ -312,6 +290,7 @@ def create_package(
             "excluded_for_security": list(EXCLUDED_LABELS),
             "export_warnings": export_warnings,
             "mode": "replacement-only",
+            "local_index_policy": "excluded; destination index is backed up, removed, and rebuilt by Codex",
         }
         manifest_path = stage / MANIFEST_NAME
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -394,7 +373,7 @@ def is_allowed_payload_path(name: str) -> bool:
     pure = _safe_zip_name(name)
     root = pure.parts[0].casefold()
     allowed_dirs = {item.casefold() for item in DATA_DIRS}
-    allowed_files = {item.casefold() for item in PLAIN_FILES + (GLOBAL_STATE_FILE,) + DATABASE_FILES}
+    allowed_files = {item.casefold() for item in PLAIN_FILES + (GLOBAL_STATE_FILE,)}
     if len(pure.parts) == 1:
         return root in allowed_files
     return root in allowed_dirs
@@ -556,28 +535,6 @@ def inspect_package_paths(
                     for match in re.finditer(r"(?i)(?:[A-Z]:[\\/][^\"'\r\n]+|\\\\[^\\/\s]+[\\/][^\\/\s]+(?:[\\/][^\"'\r\n]+)?)", text):
                         _collect_structured_paths({"path": match.group(0).rstrip()}, found, "automation", True)
 
-            if "state_5.sqlite" in names:
-                with tempfile.TemporaryDirectory(prefix="codex-transfer-paths-") as temp:
-                    database = Path(temp) / "state_5.sqlite"
-                    database.write_bytes(archive.read("state_5.sqlite"))
-                    conn: Optional[sqlite3.Connection] = None
-                    try:
-                        conn = sqlite3.connect(database.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
-                        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
-                        for (table,) in tables:
-                            columns = conn.execute(f"PRAGMA table_info({quote_identifier(table)})").fetchall()
-                            for column in (str(c[1]) for c in columns if str(c[1]).lower() in PATH_FIELD_NAMES):
-                                try:
-                                    query = f"SELECT {quote_identifier(column)} FROM {quote_identifier(table)} WHERE {quote_identifier(column)} IS NOT NULL"
-                                    for (value,) in conn.execute(query):
-                                        _collect_structured_paths({column: value}, found, "SQLite", True)
-                                except sqlite3.Error:
-                                    continue
-                    except sqlite3.Error:
-                        pass
-                    finally:
-                        if conn is not None:
-                            conn.close()
     except (zipfile.BadZipFile, OSError) as exc:
         raise TransferError(f"Unable to inspect package paths: {exc}") from exc
 
@@ -681,38 +638,6 @@ def rewrite_jsonl_file(path: Path, maps: list[tuple[str, str]]) -> int:
     finally:
         temporary.unlink(missing_ok=True)
     return count
-
-
-def rewrite_sqlite(path: Path, maps: list[tuple[str, str]]) -> int:
-    if not path.is_file():
-        return 0
-    conn = sqlite3.connect(str(path))
-    changed = 0
-    try:
-        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
-        for (table,) in tables:
-            columns = conn.execute(f"PRAGMA table_info({quote_identifier(table)})").fetchall()
-            for column in (str(c[1]) for c in columns if str(c[1]).lower() in PATH_FIELD_NAMES):
-                query = f"SELECT DISTINCT {quote_identifier(column)} FROM {quote_identifier(table)} WHERE {quote_identifier(column)} IS NOT NULL"
-                try:
-                    values = conn.execute(query).fetchall()
-                    for (old_value,) in values:
-                        if not isinstance(old_value, str):
-                            continue
-                        new_value = replace_path_prefix(old_value, maps)
-                        if new_value != old_value:
-                            update = f"UPDATE {quote_identifier(table)} SET {quote_identifier(column)}=? WHERE {quote_identifier(column)}=?"
-                            cursor = conn.execute(update, (new_value, old_value))
-                            changed += max(cursor.rowcount, 0)
-                except sqlite3.Error:
-                    continue
-        conn.commit()
-    except sqlite3.Error as exc:
-        conn.rollback()
-        raise TransferError(f"Unable to rewrite staged database {path.name}: {exc}") from exc
-    finally:
-        conn.close()
-    return changed
 
 
 def discover_profile_key(global_state: Path) -> Optional[str]:
@@ -820,16 +745,15 @@ def rewrite_stage(stage: Path, maps: list[tuple[str, str]], target_profile: Opti
             if converted != text:
                 counts["toml"] += 1
                 path.write_text(converted, encoding="utf-8")
-        elif path.name in DATABASE_FILES:
-            counts["sqlite"] += rewrite_sqlite(path, maps)
     return counts
 
 
 def scoped_paths(codex_dir: Path) -> list[Path]:
-    paths = [codex_dir / name for name in DATA_DIRS + PLAIN_FILES + (GLOBAL_STATE_FILE,) + DATABASE_FILES]
-    for filename in DATABASE_FILES:
-        paths.extend(codex_dir / (filename + suffix) for suffix in DATABASE_SIDE_SUFFIXES)
-    return paths
+    # The three local index files are deliberately in the replacement scope
+    # even though they are excluded from packages. Backing them up and removing
+    # them prevents stale destination rows and makes Codex build a fresh,
+    # machine-local index from the imported rollout files.
+    return [codex_dir / name for name in DATA_DIRS + PLAIN_FILES + (GLOBAL_STATE_FILE,) + LOCAL_INDEX_FILES]
 
 
 def _archive_existing_destination(destination: Path, backup: Path, progress: Progress) -> int:
@@ -897,11 +821,14 @@ def inspect_codex_data(root: Path, check_rollouts: bool = True) -> dict[str, Any
         "attachments": count_files(root / "attachments"),
         "automations": automations,
         "database_threads": None,
+        "database_present": False,
+        "database_rebuild_required": False,
         "custom_sections": None,
         "missing_rollout_paths": [],
     }
-    database = root / "state_5.sqlite"
+    database = root / LOCAL_INDEX_DATABASE
     if database.is_file():
+        result["database_present"] = True
         conn: Optional[sqlite3.Connection] = None
         try:
             conn = sqlite3.connect(database.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
@@ -919,11 +846,12 @@ def inspect_codex_data(root: Path, check_rollouts: bool = True) -> dict[str, Any
         finally:
             if conn is not None:
                 conn.close()
-    result["ok"] = (
-        result["database_threads"] == result["session_files"]
-        and not result["missing_rollout_paths"]
-        and not result.get("database_error")
-    )
+    if result["database_present"]:
+        database_consistent = result["database_threads"] == result["session_files"]
+    else:
+        database_consistent = True
+        result["database_rebuild_required"] = result["session_files"] > 0
+    result["ok"] = database_consistent and not result["missing_rollout_paths"] and not result.get("database_error")
     return result
 
 
@@ -1026,6 +954,8 @@ def import_package(
         "path_maps": [{"old": old, "new": new} for old, new in maps],
         "backup": str(backup),
         "backup_files": 0,
+        "local_index_policy": "destination files backed up and removed; old-computer database not imported",
+        "local_index_files_backed_up": [name for name in LOCAL_INDEX_FILES if (destination / name).is_file()],
         "rewrite_counts": {},
         "applied": False,
         "rolled_back": False,
