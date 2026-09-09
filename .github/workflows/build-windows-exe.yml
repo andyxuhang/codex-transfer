@@ -6,10 +6,12 @@ on:
       release_tag:
         description: Release tag to build and upload
         required: true
-        default: v1.0
+        default: v1.1.0
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -42,6 +44,11 @@ jobs:
         run: |
           $hash = (Get-FileHash -Algorithm SHA256 "dist\Codex-Transfer.exe").Hash.ToLowerInvariant()
           "$hash  Codex-Transfer.exe" | Set-Content -Encoding ascii "dist\Codex-Transfer.exe.sha256.txt"
+
+      - name: Attest executable build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/Codex-Transfer.exe
 
       - uses: actions/upload-artifact@v4
         with:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0 — 2026-09-09
+
+- Keep the final replacement-import button disabled until the user selects the explicit overwrite confirmation.
+- Recommend running the portable executable from a USB-drive root so the default package is created there.
+- Publish GitHub build-provenance attestations for new Windows executables.
+
 ## 1.0 — 2026-09-09
 
 - Prepare the first public release from the completed migration workflow.

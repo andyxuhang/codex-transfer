@@ -276,6 +276,7 @@ class CodexTransferApp:
         self._last_codex_processes: list[str] = []
         self.widgets: dict[str, Any] = {}
         self.busy_buttons: list[Any] = []
+        self._busy = False
         self._build()
         self._translate()
         self._check_codex_status()
@@ -358,12 +359,16 @@ class CodexTransferApp:
         mapping_row.columnconfigure(0, weight=1)
         ttk.Label(mapping_row, textvariable=self.path_map_summary, foreground="#7A4E00").grid(row=0, column=0, sticky="w")
         self._button(mapping_row, "inspect_paths", self._inspect_paths).grid(row=0, column=1, padx=(10, 0))
-        self.widgets["confirm"] = ttk.Checkbutton(import_box, variable=self.confirmed)
+        self.widgets["confirm"] = ttk.Checkbutton(
+            import_box, variable=self.confirmed, command=self._update_apply_button_state,
+        )
         self.widgets["confirm"].grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 4))
         actions2 = ttk.Frame(import_box)
         actions2.grid(row=6, column=1, columnspan=2, sticky="e", pady=(4, 0))
         self._button(actions2, "verify", self._verify).pack(side="left", padx=4)
-        self._button(actions2, "apply", self._import).pack(side="left", padx=4)
+        self.apply_button = self._button(actions2, "apply", self._import)
+        self.apply_button.pack(side="left", padx=4)
+        self._update_apply_button_state()
 
         status_row = ttk.Frame(outer)
         status_row.pack(fill="x", pady=(0, 8))
@@ -619,11 +624,18 @@ class CodexTransferApp:
         self.path_map_summary.set(self.t("path_map_count").format(total=len(rows), custom=len(self.custom_maps)))
 
     def _set_busy(self, busy: bool) -> None:
+        self._busy = busy
         for button in self.busy_buttons:
             button.configure(state="disabled" if busy else "normal")
+        self._update_apply_button_state()
         self.status.set(self.t("busy") if busy else self.t("ready"))
         if not busy:
             self.progress_value.set(0)
+
+    def _update_apply_button_state(self) -> None:
+        self.apply_button.configure(
+            state="normal" if self.confirmed.get() and not self._busy else "disabled",
+        )
 
     def _append_log(self, message: str) -> None:
         self.log.configure(state="normal")

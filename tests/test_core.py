@@ -165,6 +165,25 @@ class TransferTests(unittest.TestCase):
         with self.assertRaises(core.TransferError):
             core.import_package(package, self.base / "new" / ".codex", [], False)
 
+    def test_apply_button_is_enabled_only_after_replacement_confirmation(self):
+        button = mock.Mock()
+        app = object.__new__(gui.CodexTransferApp)
+        app.apply_button = button
+        app.confirmed = mock.Mock()
+        app._busy = False
+
+        app.confirmed.get.return_value = False
+        app._update_apply_button_state()
+        button.configure.assert_called_with(state="disabled")
+
+        app.confirmed.get.return_value = True
+        app._update_apply_button_state()
+        button.configure.assert_called_with(state="normal")
+
+        app._busy = True
+        app._update_apply_button_state()
+        button.configure.assert_called_with(state="disabled")
+
     def test_package_tamper_is_detected(self):
         package = self.base / "transfer.zip"
         core.create_package(self.source, package)
