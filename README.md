@@ -21,6 +21,7 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 - 自定义侧栏分区、置顶状态和界面布局数据
 - 自动任务及其定时计划：`automations/*/automation.toml`
 - 不同用户名、盘符和项目根目录的路径映射
+- 独立路径检查窗口：归并深层路径、显示引用来源，并在导入前逐项决定是否映射
 
 ### 永远不会迁移什么
 
@@ -45,6 +46,7 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 - 导入前把目标电脑的全部可迁移数据备份为 ZIP。
 - 只清除明确白名单中的可迁移数据，目标电脑的登录状态和机器配置保留。
 - 所有路径改写均在临时 staging 目录完成，不修改迁移包。
+- 迁移包使用普通 ZIP 压缩但不加密；其中的聊天、配置和附件应按敏感备份保管。
 - 只覆盖聊天相关白名单数据；目标电脑中的工作目录、规则、记忆和技能保持不变。
 - 安装中途失败会自动恢复导入前备份。
 - 导入后自动核对数据库线程数、JSONL 数量和每个 `rollout_path`。
@@ -64,7 +66,8 @@ A focused, replacement-only Windows migration utility for local Codex and ChatGP
 4. 在蓝色“旧电脑：导出”页面选择 `.codex` 数据目录和迁移包位置，点击“扫描”，然后“创建迁移包”。默认保存在工具所在文件夹，文件名带时间，不再猜测本地化或重定向的桌面路径。
 5. 把整个迁移包复制到新电脑。
 6. 在新电脑打开本工具，切换到橙色“新电脑：覆盖导入”页面，选择迁移包和目标 `.codex`，点击“校验迁移包”。
-7. 界面会显示自动路径映射。大多数用户无需填写手动映射；只有外部项目盘符或根目录变化时才添加。
+7. 点击“查看并设置路径映射”。独立窗口只读取结构化路径字段，不扫描聊天正文；深层引用会归并为安全的顶级根目录。
+8. 对找不到的项目根目录选择新位置；也可以明确保持原路径或暂不处理。用户名和 `.codex` 目录变化仍会自动映射。
 8. 确认状态条变绿，勾选覆盖确认框，点击“备份并覆盖导入”。
 9. 保存备份和结果 JSON，启动 Codex 检查聊天、分区和自动任务。
 
@@ -117,6 +120,7 @@ C:\Users\<用户名>\CodexTransferBackups\before-import-YYYYMMDD-HHMMSS.zip
 - Custom sidebar sections, pins, and layout state
 - Automations and schedules from `automations/*/automation.toml`
 - Automatic user-home and `.codex` path migration, plus custom path-prefix maps
+- A separate path-review window that groups deep references and lets users decide each project-root mapping
 
 ### What it never transfers
 
@@ -140,6 +144,7 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 - Every payload file is protected by SHA-256; verification failure blocks import.
 - All migratable destination data is backed up before replacement.
 - Only allowlisted user-data paths are cleared. Destination credentials and machine configuration remain intact.
+- Packages use ordinary ZIP compression and are not encrypted; handle chats, settings, and attachments as sensitive backup data.
 - Path rewriting happens in a temporary staging directory and never changes the package.
 - Only the conversation-data allowlist is replaced; destination workspaces, rules, memories, and skills remain untouched.
 - An interrupted installation attempts to restore the pre-import backup automatically.
@@ -160,7 +165,8 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 4. On the blue **Old PC: Export** tab, select the `.codex` directory and a package path. Scan, then create the package. The default is a timestamped file beside the tool, avoiding localized or redirected Desktop folders.
 5. Copy the package to the new PC.
 6. On the new PC, open the orange **New PC: Replace import** tab, select and verify the package, then select the destination `.codex` directory.
-7. Review the automatic maps shown in the UI. Most users need no manual map; add one only when an external project drive or root changed.
+7. Click **Review and set path maps**. The separate window reads structured path fields only, not chat prose, and groups deep references under safe top-level roots.
+8. Choose a new location for missing project roots, explicitly keep an old path, or leave it unresolved. User-home and `.codex` changes remain automatic.
 8. Wait for the status bar to turn green, accept the replacement confirmation, and start the import.
 9. Keep the backup and result JSON while checking chats, sections, and automations in Codex.
 

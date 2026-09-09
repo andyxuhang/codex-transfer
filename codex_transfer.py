@@ -34,14 +34,27 @@ TEXT = {
         "import": "⬇ 新电脑：覆盖导入",
         "import_banner": "第 2 步 · 在新电脑备份并覆盖导入",
         "destination": "目标 Codex 目录",
-        "old_path": "旧路径前缀",
-        "new_path": "新路径前缀",
         "auto_map": "自动路径映射",
         "auto_map_default": "选择迁移包后自动显示；大多数用户无需手动映射",
         "auto_map_same": "源目录与目标目录相同，无需路径转换",
-        "manual_map_hint": "可选：仅当外部项目盘符或根目录发生变化时填写",
-        "add_map": "添加路径映射",
-        "remove_map": "删除选中映射",
+        "inspect_paths": "查看并设置路径映射",
+        "path_map_summary": "尚未检查迁移包中的路径",
+        "path_map_count": "已检查 {total} 个顶级路径，已设置 {custom} 项",
+        "path_dialog_title": "迁移路径检查与映射",
+        "path_privacy": "迁移包未加密，聊天和配置可被读取。下表只列出结构化路径，不扫描聊天正文。",
+        "path_old": "旧电脑顶级路径",
+        "path_new": "新电脑位置",
+        "path_count": "引用次数",
+        "path_source": "来源",
+        "path_status": "状态",
+        "path_auto": "自动映射",
+        "path_exists": "原路径存在",
+        "path_missing": "需要确认",
+        "choose_new_path": "为选中项选择新位置",
+        "keep_old_path": "保持原路径（不映射）",
+        "clear_path": "恢复自动建议／暂不处理",
+        "apply_path_maps": "应用所选映射",
+        "select_path_row": "请先选择一条路径。",
         "confirm": "我确认目标中的聊天、Work、分区和自动任务可以被备份后覆盖（不合并）",
         "apply": "备份并覆盖导入",
         "log": "进度与结果",
@@ -56,7 +69,6 @@ TEXT = {
         "choose_package_save": "保存 Codex Transfer 迁移包",
         "choose_package": "选择 Codex Transfer 迁移包",
         "choose_destination": "选择目标 .codex 目录",
-        "map_missing": "请同时填写旧路径和新路径。",
         "package_ok": "迁移包校验通过",
         "version": "版本",
         "folder_missing": "迁移包所在文件夹尚不存在。",
@@ -78,14 +90,27 @@ TEXT = {
         "import": "⬇ New PC: Replace import",
         "import_banner": "STEP 2 · Back up and replace on the new PC",
         "destination": "Destination Codex directory",
-        "old_path": "Old path prefix",
-        "new_path": "New path prefix",
         "auto_map": "Automatic path maps",
         "auto_map_default": "Select a package to preview; most users need no manual map",
         "auto_map_same": "Source and destination paths match; no path conversion is needed",
-        "manual_map_hint": "Optional: use only when an external project drive or root changed",
-        "add_map": "Add path map",
-        "remove_map": "Remove selected map",
+        "inspect_paths": "Review and set path maps",
+        "path_map_summary": "Package paths have not been inspected",
+        "path_map_count": "Reviewed {total} top-level paths; {custom} custom choices",
+        "path_dialog_title": "Migration path review and mapping",
+        "path_privacy": "The package is not encrypted, so chats and settings are readable. Only structured paths are listed; chat text is not scanned.",
+        "path_old": "Old PC top-level path",
+        "path_new": "New PC location",
+        "path_count": "References",
+        "path_source": "Source",
+        "path_status": "Status",
+        "path_auto": "Automatic",
+        "path_exists": "Original exists",
+        "path_missing": "Review needed",
+        "choose_new_path": "Choose new location",
+        "keep_old_path": "Keep original (no mapping)",
+        "clear_path": "Reset suggestion / leave unresolved",
+        "apply_path_maps": "Apply selected maps",
+        "select_path_row": "Select a path first.",
         "confirm": "I confirm destination chats, Work data, sections, and automations may be backed up and replaced (no merge)",
         "apply": "Back up and replace",
         "log": "Progress and results",
@@ -100,7 +125,6 @@ TEXT = {
         "choose_package_save": "Save Codex Transfer package",
         "choose_package": "Select Codex Transfer package",
         "choose_destination": "Select destination .codex directory",
-        "map_missing": "Enter both old and new path prefixes.",
         "package_ok": "Package verification passed",
         "version": "Version",
         "folder_missing": "The migration package folder does not exist yet.",
@@ -119,8 +143,8 @@ class CodexTransferApp:
         self.ttk = ttk
         self.root = tk.Tk()
         self.root.title("Codex Transfer")
-        self.root.geometry("920x760")
-        self.root.minsize(780, 660)
+        self.root.geometry("920x680")
+        self.root.minsize(780, 590)
         self.language = tk.StringVar(value="zh")
         self.source = tk.StringVar(value=str(core.default_codex_dir()))
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -128,9 +152,9 @@ class CodexTransferApp:
         self.export_package = tk.StringVar(value=str(default_package))
         self.import_package = tk.StringVar(value="")
         self.destination = tk.StringVar(value=str(core.default_codex_dir()))
-        self.old_path = tk.StringVar()
-        self.new_path = tk.StringVar()
         self.auto_map_text = tk.StringVar(value=TEXT["zh"]["auto_map_default"])
+        self.path_map_summary = tk.StringVar(value=TEXT["zh"]["path_map_summary"])
+        self.custom_maps: list[tuple[str, str]] = []
         self.confirmed = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value=TEXT["zh"]["ready"])
         self.progress_value = tk.DoubleVar(value=0)
@@ -168,7 +192,7 @@ class CodexTransferApp:
 
     def _build(self) -> None:
         tk, ttk = self.tk, self.ttk
-        outer = ttk.Frame(self.root, padding=18)
+        outer = ttk.Frame(self.root, padding=14)
         outer.pack(fill="both", expand=True)
         header = ttk.Frame(outer)
         header.pack(fill="x")
@@ -178,12 +202,12 @@ class CodexTransferApp:
         language_box.pack(side="right")
         language_box.bind("<<ComboboxSelected>>", lambda _: self._translate())
         self.widgets["subtitle"] = ttk.Label(outer, foreground="#555555")
-        self.widgets["subtitle"].pack(anchor="w", pady=(3, 8))
+        self.widgets["subtitle"].pack(anchor="w", pady=(2, 6))
         self.codex_status_label = tk.Label(outer, anchor="w", padx=10, pady=7, font=("Segoe UI", 10, "bold"))
-        self.codex_status_label.pack(fill="x", pady=(0, 12))
+        self.codex_status_label.pack(fill="x", pady=(0, 8))
 
         self.notebook = ttk.Notebook(outer)
-        self.notebook.pack(fill="x", pady=(0, 12))
+        self.notebook.pack(fill="x", pady=(0, 8))
 
         export_box = ttk.Frame(self.notebook, padding=12)
         export_box.columnconfigure(1, weight=1)
@@ -207,28 +231,19 @@ class CodexTransferApp:
         self.widgets["import_banner"].grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
         package_entry = self._build_path_row(import_box, 1, "package_import", self.import_package, self._browse_import_package)
         destination_entry = self._build_path_row(import_box, 2, "destination", self.destination, self._browse_destination)
-        package_entry.bind("<FocusOut>", lambda _event: self._refresh_auto_map(), add="+")
-        destination_entry.bind("<FocusOut>", lambda _event: self._refresh_auto_map(), add="+")
+        package_entry.bind("<FocusOut>", self._path_inputs_changed, add="+")
+        destination_entry.bind("<FocusOut>", self._path_inputs_changed, add="+")
         self._label(import_box, "auto_map").grid(row=3, column=0, sticky="nw", padx=(0, 10), pady=6)
         ttk.Label(import_box, textvariable=self.auto_map_text, foreground="#1769AA", wraplength=650, justify="left").grid(row=3, column=1, columnspan=2, sticky="w", pady=6)
-        self.widgets["manual_map_hint"] = ttk.Label(import_box, foreground="#7A4E00")
-        self.widgets["manual_map_hint"].grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 2))
-        self._label(import_box, "old_path").grid(row=5, column=0, sticky="w", padx=(0, 10), pady=6)
-        old_entry = ttk.Entry(import_box, textvariable=self.old_path)
-        old_entry.grid(row=5, column=1, sticky="ew", pady=6)
-        old_entry.bind("<FocusOut>", lambda _event: self._normalize_variable(self.old_path))
-        self._label(import_box, "new_path").grid(row=6, column=0, sticky="w", padx=(0, 10), pady=6)
-        new_entry = ttk.Entry(import_box, textvariable=self.new_path)
-        new_entry.grid(row=6, column=1, sticky="ew", pady=6)
-        new_entry.bind("<FocusOut>", lambda _event: self._normalize_variable(self.new_path))
-        self._button(import_box, "add_map", self._add_map).grid(row=5, column=2, rowspan=2, padx=(8, 0))
-        self.maps = tk.Listbox(import_box, height=3, selectmode="extended")
-        self.maps.grid(row=7, column=1, sticky="ew", pady=6)
-        self._button(import_box, "remove_map", self._remove_map).grid(row=7, column=2, padx=(8, 0))
+        mapping_row = ttk.Frame(import_box)
+        mapping_row.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(7, 2))
+        mapping_row.columnconfigure(0, weight=1)
+        ttk.Label(mapping_row, textvariable=self.path_map_summary, foreground="#7A4E00").grid(row=0, column=0, sticky="w")
+        self._button(mapping_row, "inspect_paths", self._inspect_paths).grid(row=0, column=1, padx=(10, 0))
         self.widgets["confirm"] = ttk.Checkbutton(import_box, variable=self.confirmed)
-        self.widgets["confirm"].grid(row=8, column=0, columnspan=3, sticky="w", pady=(8, 4))
+        self.widgets["confirm"].grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 4))
         actions2 = ttk.Frame(import_box)
-        actions2.grid(row=9, column=1, columnspan=2, sticky="e", pady=(6, 0))
+        actions2.grid(row=6, column=1, columnspan=2, sticky="e", pady=(4, 0))
         self._button(actions2, "verify", self._verify).pack(side="left", padx=4)
         self._button(actions2, "apply", self._import).pack(side="left", padx=4)
 
@@ -257,6 +272,8 @@ class CodexTransferApp:
         self.root.title(f"{self.t('title')} — {core.APP_VERSION}")
         self._render_codex_status()
         self._refresh_auto_map()
+        if not self.custom_maps:
+            self.path_map_summary.set(self.t("path_map_summary"))
 
     def _render_codex_status(self) -> None:
         if self._last_codex_processes:
@@ -291,6 +308,8 @@ class CodexTransferApp:
         value = filedialog.askopenfilename(title=self.t("choose_package"), filetypes=(("Codex Transfer", "*.zip"), ("All files", "*.*")))
         if value:
             self.import_package.set(core.normalize_path_text(value))
+            self.custom_maps.clear()
+            self.path_map_summary.set(self.t("path_map_summary"))
             self._refresh_auto_map()
 
     def _browse_destination(self) -> None:
@@ -298,6 +317,8 @@ class CodexTransferApp:
         value = filedialog.askdirectory(title=self.t("choose_destination"), initialdir=self.destination.get())
         if value:
             self.destination.set(core.normalize_path_text(value))
+            self.custom_maps.clear()
+            self.path_map_summary.set(self.t("path_map_summary"))
             self._refresh_auto_map()
 
     def _open_export_folder(self) -> None:
@@ -331,32 +352,142 @@ class CodexTransferApp:
         except (core.TransferError, OSError):
             self.auto_map_text.set(self.t("auto_map_default"))
 
+    def _path_inputs_changed(self, _event: Any = None) -> None:
+        self.custom_maps.clear()
+        self.path_map_summary.set(self.t("path_map_summary"))
+        self._refresh_auto_map()
+
     def _normalize_variable(self, variable: Any) -> str:
         value = core.normalize_path_text(variable.get())
         variable.set(value)
         return value
 
-    def _add_map(self) -> None:
-        from tkinter import messagebox
-        old = self._normalize_variable(self.old_path)
-        new = self._normalize_variable(self.new_path)
-        if not old or not new:
-            messagebox.showwarning(self.t("warning"), self.t("map_missing"))
-            return
-        self.maps.insert("end", f"{old}  →  {new}")
-        self.old_path.set("")
-        self.new_path.set("")
-
-    def _remove_map(self) -> None:
-        for index in reversed(self.maps.curselection()):
-            self.maps.delete(index)
-
     def _map_values(self) -> list[tuple[str, str]]:
-        output = []
-        for item in self.maps.get(0, "end"):
-            old, new = item.split("  →  ", 1)
-            output.append((old, new))
-        return output
+        return list(self.custom_maps)
+
+    def _inspect_paths(self) -> None:
+        from tkinter import messagebox
+        package_text = self._normalize_variable(self.import_package)
+        if not package_text or not Path(package_text).is_file():
+            messagebox.showwarning(self.t("warning"), self.t("choose_package"))
+            return
+        package = Path(package_text)
+        destination = Path(self._normalize_variable(self.destination))
+        self._run(
+            lambda: core.inspect_package_paths(package, destination, self._progress),
+            self._show_path_dialog,
+        )
+
+    def _show_path_dialog(self, report: dict[str, Any]) -> None:
+        from tkinter import filedialog, messagebox, ttk
+        window = self.tk.Toplevel(self.root)
+        window.title(self.t("path_dialog_title"))
+        window.geometry("1040x560")
+        window.minsize(820, 430)
+        window.transient(self.root)
+        window.grab_set()
+        body = ttk.Frame(window, padding=14)
+        body.pack(fill="both", expand=True)
+        self.tk.Label(
+            body, text=self.t("path_privacy"), bg="#FFF4E5", fg="#7A2E0E",
+            anchor="w", justify="left", padx=10, pady=8,
+        ).pack(fill="x", pady=(0, 10))
+        columns = ("old", "new", "count", "source", "status")
+        tree_frame = ttk.Frame(body)
+        tree_frame.pack(fill="both", expand=True)
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse")
+        headings = {
+            "old": self.t("path_old"), "new": self.t("path_new"),
+            "count": self.t("path_count"), "source": self.t("path_source"),
+            "status": self.t("path_status"),
+        }
+        widths = {"old": 280, "new": 280, "count": 75, "source": 150, "status": 105}
+        for column in columns:
+            tree.heading(column, text=headings[column])
+            tree.column(column, width=widths[column], minwidth=60, stretch=column in {"old", "new", "source"})
+        scroll_y = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+        scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
+        tree.grid(row=0, column=0, sticky="nsew")
+        scroll_y.grid(row=0, column=1, sticky="ns")
+        scroll_x.grid(row=1, column=0, sticky="ew")
+        tree_frame.rowconfigure(0, weight=1)
+        tree_frame.columnconfigure(0, weight=1)
+
+        rows = report.get("paths", [])
+        automatic = {item["old"].casefold(): item["new"] for item in report.get("automatic_maps", [])}
+        existing_custom = {old.casefold(): new for old, new in self.custom_maps}
+
+        def status_text(row: dict[str, Any]) -> str:
+            if row.get("automatic"):
+                return self.t("path_auto")
+            return self.t("path_exists") if row.get("exists") else self.t("path_missing")
+
+        def refresh_row(index: int) -> None:
+            row = rows[index]
+            tree.item(str(index), values=(
+                row["old"], row.get("new", ""), row.get("count", 0),
+                ", ".join(row.get("sources", [])), status_text(row),
+            ))
+
+        for index, row in enumerate(rows):
+            if row["old"].casefold() in existing_custom:
+                row["new"] = existing_custom[row["old"].casefold()]
+            tree.insert("", "end", iid=str(index))
+            refresh_row(index)
+
+        def selected_index() -> Optional[int]:
+            selection = tree.selection()
+            if not selection:
+                messagebox.showwarning(self.t("warning"), self.t("select_path_row"), parent=window)
+                return None
+            return int(selection[0])
+
+        def choose_new() -> None:
+            index = selected_index()
+            if index is None:
+                return
+            row = rows[index]
+            initial = row.get("new") or str(Path(self.destination.get()).parent)
+            value = filedialog.askdirectory(title=self.t("choose_new_path"), initialdir=initial, parent=window)
+            if value:
+                row["new"] = core.normalize_path_text(value)
+                refresh_row(index)
+
+        def keep_old() -> None:
+            index = selected_index()
+            if index is not None:
+                rows[index]["new"] = rows[index]["old"]
+                refresh_row(index)
+
+        def clear_new() -> None:
+            index = selected_index()
+            if index is not None:
+                old = rows[index]["old"]
+                rows[index]["new"] = automatic.get(old.casefold(), "")
+                refresh_row(index)
+
+        def apply_maps() -> None:
+            choices: list[tuple[str, str]] = []
+            for row in rows:
+                old, new = row["old"], row.get("new", "")
+                auto_new = automatic.get(old.casefold())
+                if auto_new is not None:
+                    if new and core.normalize_path_text(new).casefold() != core.normalize_path_text(auto_new).casefold():
+                        choices.append((old, new))
+                elif new and core.normalize_path_text(new).casefold() != core.normalize_path_text(old).casefold():
+                    choices.append((old, new))
+            self.custom_maps = core.parse_path_maps(choices) if choices else []
+            self.path_map_summary.set(self.t("path_map_count").format(total=len(rows), custom=len(self.custom_maps)))
+            window.destroy()
+
+        controls = ttk.Frame(body)
+        controls.pack(fill="x", pady=(10, 0))
+        ttk.Button(controls, text=self.t("choose_new_path"), command=choose_new).pack(side="left", padx=(0, 6))
+        ttk.Button(controls, text=self.t("keep_old_path"), command=keep_old).pack(side="left", padx=6)
+        ttk.Button(controls, text=self.t("clear_path"), command=clear_new).pack(side="left", padx=6)
+        ttk.Button(controls, text=self.t("apply_path_maps"), command=apply_maps).pack(side="right")
+        self.path_map_summary.set(self.t("path_map_count").format(total=len(rows), custom=len(self.custom_maps)))
 
     def _set_busy(self, busy: bool) -> None:
         for button in self.busy_buttons:

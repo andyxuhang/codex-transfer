@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.7 — 2026-09-09
+
+- Add a separate path-review window that discovers structured path references without scanning chat prose.
+- Group deep references into safe top-level roots and show automatic, existing, and unresolved paths.
+- Let users choose a new folder, explicitly keep the old path, or leave a path unresolved before import.
+- Make the main window more compact while retaining the shared progress/output panel.
+- Clearly warn that migration ZIP packages are compressed but not encrypted.
+
 ## 1.0.6 — 2026-09-09
 
 - Stop guessing the Windows Desktop path, which may be localized or redirected.

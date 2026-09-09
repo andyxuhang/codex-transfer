@@ -222,6 +222,31 @@ class TransferTests(unittest.TestCase):
         )
         self.assertEqual(automatic[0], (r"C:\Users\Old User\.codex", r"D:\Users\New User\.codex"))
         self.assertEqual(automatic[1], (r"C:\Users\Old User", r"D:\Users\New User"))
+        keep_original = core.parse_path_maps(automatic + [(r"C:\Users\Old User\Desktop", r"C:\Users\Old User\Desktop")])
+        self.assertEqual(
+            core.replace_path_prefix(r"C:\Users\Old User\Desktop\Project", keep_original),
+            r"C:\Users\Old User\Desktop\Project",
+        )
+
+    def test_package_path_inspection_groups_roots_without_reading_chat_text(self):
+        external = r"D:\ESP32\AeroMeter"
+        self.rollout_a.write_text(
+            json.dumps({"type": "session_meta", "payload": {"cwd": external, "message": r"C:\Secret\MentionedOnly"}}) + "\n" +
+            json.dumps({"type": "session_meta", "payload": {"cwd": str(Path.home() / "Documents" / "Example")}}) + "\n",
+            encoding="utf-8",
+        )
+        package = self.base / "transfer.zip"
+        core.create_package(self.source, package)
+        destination = self.base / "New User" / ".codex"
+        report = core.inspect_package_paths(package, destination)
+        rows = {row["old"].casefold(): row for row in report["paths"]}
+        self.assertIn(r"D:\ESP32".casefold(), rows)
+        self.assertNotIn(r"C:\Secret".casefold(), rows)
+        source_documents = str(Path.home().resolve() / "Documents").casefold()
+        self.assertIn(source_documents, rows)
+        self.assertTrue(report["plaintext"])
+        expected_home = str(Path.home().resolve()).casefold()
+        self.assertTrue(any(item["old"].casefold() == expected_home for item in report["automatic_maps"]))
 
 
 if __name__ == "__main__":

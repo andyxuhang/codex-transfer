@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import io
 import json
 import ntpath
 import os
@@ -22,7 +23,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Optional
 
 
-APP_VERSION = "1.0.6"
+APP_VERSION = "1.0.7"
 FORMAT_NAME = "codex-transfer-package"
 FORMAT_VERSION = 1
 MANIFEST_NAME = "codex-transfer-manifest.json"
@@ -447,6 +448,173 @@ def automatic_path_maps(manifest: dict[str, Any], destination: Path) -> list[tup
         pair for pair in pairs
         if pair[0] and normalize_path_text(pair[0]).casefold() != normalize_path_text(pair[1]).casefold()
     )
+
+
+WINDOWS_ABSOLUTE_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)")
+
+
+def _is_windows_absolute_path(value: str) -> bool:
+    return bool(WINDOWS_ABSOLUTE_PATH.match(str(value).strip().strip('"\'')))
+
+
+def _collect_structured_paths(
+    value: Any,
+    found: dict[str, dict[str, Any]],
+    source: str,
+    path_fields_only: bool,
+    parent_key: str = "",
+) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            _collect_structured_paths(child, found, source, path_fields_only, str(key).lower())
+        return
+    if isinstance(value, list):
+        for child in value:
+            _collect_structured_paths(child, found, source, path_fields_only, parent_key)
+        return
+    if not isinstance(value, str):
+        return
+    if path_fields_only and parent_key not in PATH_FIELD_NAMES:
+        return
+    if not _is_windows_absolute_path(value):
+        return
+    normalized = normalize_path_text(value)
+    key = normalized.casefold()
+    item = found.setdefault(key, {"path": normalized, "count": 0, "sources": set()})
+    item["count"] += 1
+    item["sources"].add(source)
+
+
+def _top_mapping_root(path: str, source_home: str, source_codex: str) -> str:
+    normalized = normalize_path_text(path)
+    comparable = normalized.casefold()
+    codex = normalize_path_text(source_codex) if source_codex else ""
+    if codex and (comparable == codex.casefold() or comparable.startswith(codex.casefold() + "\\")):
+        return codex
+    home = normalize_path_text(source_home) if source_home else ""
+    if home:
+        if comparable == home.casefold():
+            return home
+        if comparable.startswith(home.casefold() + "\\"):
+            remainder = normalized[len(home):].strip("\\/")
+            first = remainder.replace("/", "\\").split("\\", 1)[0]
+            return home + "\\" + first if first else home
+    drive, tail = ntpath.splitdrive(normalized)
+    parts = [part for part in tail.strip("\\/").replace("/", "\\").split("\\") if part]
+    if not drive or not parts:
+        return normalized
+    if parts[0].casefold() == "users" and len(parts) >= 2:
+        return drive + "\\" + "\\".join(parts[:2])
+    return drive + "\\" + parts[0]
+
+
+def inspect_package_paths(
+    package: Path,
+    destination: Path,
+    progress: Progress = noop_progress,
+) -> dict[str, Any]:
+    """Read structured path references from a package without modifying it."""
+    package = package.resolve()
+    manifest = read_package_manifest(package)
+    source_home = str(manifest.get("source_user_home", ""))
+    source_codex = str(manifest.get("source_codex_dir", ""))
+    found: dict[str, dict[str, Any]] = {}
+    for name, value in (("manifest:source_user_home", source_home), ("manifest:source_codex_dir", source_codex)):
+        if _is_windows_absolute_path(value):
+            _collect_structured_paths({"path": value}, found, name, True)
+
+    try:
+        with zipfile.ZipFile(package, "r") as archive:
+            names = [info.filename for info in archive.infolist() if not info.is_dir()]
+            for index, name in enumerate(names, 1):
+                progress(f"Inspecting paths in {name}", index / max(len(names), 1) * 0.9)
+                lower = name.lower()
+                if lower.endswith(".jsonl"):
+                    try:
+                        with archive.open(name) as raw:
+                            reader = io.TextIOWrapper(raw, encoding="utf-8-sig", errors="replace")
+                            for line in reader:
+                                if not line.strip():
+                                    continue
+                                try:
+                                    _collect_structured_paths(json.loads(line), found, "JSONL", True)
+                                except json.JSONDecodeError:
+                                    continue
+                    except (OSError, KeyError):
+                        continue
+                elif name == GLOBAL_STATE_FILE:
+                    try:
+                        value = json.loads(archive.read(name).decode("utf-8-sig"))
+                        _collect_structured_paths(value, found, "sidebar state", False)
+                    except (KeyError, UnicodeError, json.JSONDecodeError):
+                        continue
+                elif lower.endswith("automation.toml"):
+                    try:
+                        text = archive.read(name).decode("utf-8-sig", errors="replace")
+                    except KeyError:
+                        continue
+                    for match in re.finditer(r"(?i)(?:[A-Z]:[\\/][^\"'\r\n]+|\\\\[^\\/\s]+[\\/][^\\/\s]+(?:[\\/][^\"'\r\n]+)?)", text):
+                        _collect_structured_paths({"path": match.group(0).rstrip()}, found, "automation", True)
+
+            if "state_5.sqlite" in names:
+                with tempfile.TemporaryDirectory(prefix="codex-transfer-paths-") as temp:
+                    database = Path(temp) / "state_5.sqlite"
+                    database.write_bytes(archive.read("state_5.sqlite"))
+                    conn: Optional[sqlite3.Connection] = None
+                    try:
+                        conn = sqlite3.connect(database.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
+                        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
+                        for (table,) in tables:
+                            columns = conn.execute(f"PRAGMA table_info({quote_identifier(table)})").fetchall()
+                            for column in (str(c[1]) for c in columns if str(c[1]).lower() in PATH_FIELD_NAMES):
+                                try:
+                                    query = f"SELECT {quote_identifier(column)} FROM {quote_identifier(table)} WHERE {quote_identifier(column)} IS NOT NULL"
+                                    for (value,) in conn.execute(query):
+                                        _collect_structured_paths({column: value}, found, "SQLite", True)
+                                except sqlite3.Error:
+                                    continue
+                    except sqlite3.Error:
+                        pass
+                    finally:
+                        if conn is not None:
+                            conn.close()
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise TransferError(f"Unable to inspect package paths: {exc}") from exc
+
+    roots: dict[str, dict[str, Any]] = {}
+    for item in found.values():
+        root = _top_mapping_root(item["path"], source_home, source_codex)
+        key = root.casefold()
+        grouped = roots.setdefault(key, {"old": root, "count": 0, "sources": set(), "examples": []})
+        grouped["count"] += item["count"]
+        grouped["sources"].update(item["sources"])
+        if item["path"] not in grouped["examples"] and len(grouped["examples"]) < 3:
+            grouped["examples"].append(item["path"])
+
+    automatic = automatic_path_maps(manifest, destination)
+    rows = []
+    for grouped in roots.values():
+        old = grouped["old"]
+        suggested = replace_path_prefix(old, automatic)
+        auto = suggested != old
+        exists = Path(old).exists()
+        rows.append({
+            "old": old,
+            "new": suggested if auto or exists else "",
+            "automatic": auto,
+            "exists": exists,
+            "count": grouped["count"],
+            "sources": sorted(grouped["sources"]),
+            "examples": grouped["examples"],
+        })
+    rows.sort(key=lambda row: (not row["automatic"], row["old"].casefold()))
+    progress("Path inspection complete", 1.0)
+    return {
+        "package": str(package),
+        "plaintext": True,
+        "automatic_maps": [{"old": old, "new": new} for old, new in automatic],
+        "paths": rows,
+    }
 
 
 def replace_path_prefix(value: str, maps: list[tuple[str, str]]) -> str:
