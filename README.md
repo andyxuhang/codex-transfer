@@ -63,16 +63,17 @@ Move external workspaces separately with Git, cloud storage, or removable media,
 
 **Recommended:** Copy `Codex-Transfer.exe` to the root of a USB drive and run it there. The default migration-package path will then also be the USB-drive root, so no extra copy step is needed after export. Keep enough free space on the drive and eject it safely after the package is complete.
 
-1. Download `Codex-Transfer.exe` from [Releases](https://github.com/andyxuhang/codex-transfer/releases/latest) and copy it to the root of a USB drive. Run it from the USB drive; no Python installation is required.
-2. For the source version, download the source ZIP and double-click `run_codex_transfer.cmd`.
-3. The top status bar checks every second: red means Codex/ChatGPT is running; green means it is fully closed.
-4. On the blue **Old PC: Export** tab, select the `.codex` directory and package location, then scan and create the package.
-5. Copy the complete migration package to the new PC.
-6. On the orange **New PC: Replace import** tab, select the package and destination `.codex`, then verify the package.
-7. Open **Review and set path maps**. It reads structured path fields, not chat prose, and groups deep references into safe top-level roots.
-8. Choose new locations for missing project roots, explicitly keep old paths, or leave them unresolved. User-home and `.codex` changes are mapped automatically.
-9. Wait for the status bar to turn green and select the replacement checkbox. The final import button remains disabled until this confirmation is selected. Accept the confirmation dialog and start the import.
-10. Keep the backup and result JSON while checking chats, sections, and automations in Codex.
+1. Download `Codex-Transfer.exe` from [Releases](https://github.com/andyxuhang/codex-transfer/releases/latest), copy it to the root of a USB drive, and run it there. No Python installation is required.
+2. On the old PC, fully close Codex/ChatGPT and wait for the status bar to turn green.
+3. Open the blue **Old PC: Export** tab. The source `.codex` directory and the package location are normally filled in automatically; use **Scan** if you want to review the contents, then select **Create package**.
+4. Wait for completion, close the tool, and safely eject the USB drive. The EXE and migration package are already together on the drive.
+5. Connect the USB drive to the new PC and run the same EXE from the drive.
+6. Fully close Codex/ChatGPT, open the orange **New PC: Replace import** tab, select the migration package on the USB drive, and verify it. The destination `.codex` directory is normally filled in automatically.
+7. Use **Review and set path maps** only if project locations or drive letters changed. User-home and `.codex` changes are mapped automatically; unresolved external project paths can be assigned manually.
+8. Select the replacement confirmation checkbox to enable the final import button, accept the warning dialog, and start the import.
+9. After completion, open Codex and check chats, sections, and automations. Keep the USB migration package, automatic backup, and result JSON until everything is confirmed.
+
+For the source version, download the source ZIP and double-click `run_codex_transfer.cmd`. The same workflow applies, but the default package location is beside the script rather than beside the EXE.
 
 The progress/output panel remains visible below both tabs. Windows paths may use `/` or `\`; the tool normalizes them to `\` for mapping.
 
@@ -173,15 +174,16 @@ Keep both the migration package and backup until the new PC has been verified.
 **推荐用法：**把 `Codex-Transfer.exe` 复制到 U 盘根目录，然后直接从 U 盘运行。程序默认会把迁移包也生成在 U 盘根目录，导出完成后无需再次复制。请确保 U 盘空间充足，并在打包完成后安全弹出。
 
 1. 从 [Releases](https://github.com/andyxuhang/codex-transfer/releases/latest) 下载 `Codex-Transfer.exe`，复制到 U 盘根目录并从 U 盘运行，不需要安装 Python。
-2. 如需使用源码版，下载源码 ZIP 后双击 `run_codex_transfer.cmd`。
-3. 顶部状态条每秒检查一次 Codex/ChatGPT：红色表示仍在运行，绿色表示已经完全关闭。
-4. 在蓝色“旧电脑：导出”页面选择 `.codex` 数据目录和迁移包位置，然后扫描并创建迁移包。
-5. 把完整迁移包复制到新电脑。
-6. 在橙色“新电脑：覆盖导入”页面选择迁移包和目标 `.codex`，然后校验迁移包。
-7. 打开“查看并设置路径映射”。该窗口只读取结构化路径字段，不扫描聊天正文，并把深层引用归并为安全的顶级根目录。
-8. 为找不到的项目根目录选择新位置，也可以保持原路径或暂不处理。用户名和 `.codex` 目录变化会自动映射。
-9. 确认顶部状态条变绿并勾选覆盖确认框；未勾选时，最终导入按钮会保持灰色且不可点击。随后确认警告弹窗并开始导入。
-10. 保存备份和结果 JSON，启动 Codex 检查聊天、分区和自动任务。
+2. 在旧电脑上完全退出 Codex/ChatGPT，等待顶部状态条变成绿色。
+3. 打开蓝色“旧电脑：导出”页面。源 `.codex` 目录和迁移包位置通常会自动填写；如需先查看内容可点击“扫描”，然后点击“创建迁移包”。
+4. 等待创建完成，关闭工具并安全弹出 U 盘。此时 EXE 和迁移包已经一起保存在 U 盘中。
+5. 把 U 盘连接到新电脑，直接运行 U 盘中的同一个 EXE。
+6. 完全退出 Codex/ChatGPT，打开橙色“新电脑：覆盖导入”页面，选择 U 盘中的迁移包并进行校验。目标 `.codex` 目录通常会自动填写。
+7. 只有在项目位置或盘符发生变化时，才需要打开“查看并设置路径映射”。用户目录和 `.codex` 的变化会自动映射；无法识别的外部项目路径可以手动指定。
+8. 勾选覆盖确认框以启用最终导入按钮，确认警告弹窗，然后开始导入。
+9. 完成后启动 Codex，检查聊天、分区和自动任务。确认全部正常之前，请保留 U 盘中的迁移包、自动备份和结果 JSON。
+
+如需使用源码版，请下载源码 ZIP 并双击 `run_codex_transfer.cmd`。操作流程相同，但迁移包默认保存在脚本旁边，而不是 EXE 旁边。
 
 底部“进度与结果”框会在两个页面中始终显示。Windows 路径可以使用 `/` 或 `\`，工具会统一转换为 `\` 后进行映射。
 
